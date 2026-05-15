@@ -1,0 +1,29 @@
+{
+  "name": "parabank-qa-portfolio",
+  "version": "1.0.0",
+  "description": "Framework de automation para Parabank — aplicación de banca demo (Fintech).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/germanobrian1998/parabank-qa-portfolio.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/germanobrian1998/parabank-qa-portfolio/issues"
+  },
+  "homepage": "https://github.com/germanobrian1998/parabank-qa-portfolio#readme",
+  "devDependencies": {
+    "@faker-js/faker": "^10.4.0",
+    "@playwright/test": "^1.60.0",
+    "typescript": "^6.0.3"
+  }
+}
