@@ -1,11 +1,12 @@
-// src/pages/BasePage.ts
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator } from '@playwright/test';
 
 export abstract class BasePage {
   constructor(protected readonly page: Page) {}
 
-  // Por qué este método existe: Playwright lanza errores técnicos.
-  // Este método los convierte en errores de negocio.
+  get currentPage(): Page {
+    return this.page;
+  }
+
   protected async clickWithRetry(
     locator: Locator,
     businessContext: string,
