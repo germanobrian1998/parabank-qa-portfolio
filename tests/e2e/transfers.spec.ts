@@ -6,8 +6,6 @@ import { expectTransferConfirmed } from '../../src/helpers/assertions';
 test.describe('Transfers — funds movement between own accounts', () => {
 
   test(
-    // Por qué este naming: describe el escenario de negocio completo.
-    // Cuando falla en CI, el reporte dice exactamente qué escenario rompió.
     'should confirm transfer and reflect updated balance in both accounts',
     async ({ authenticatedPage, transferPage }) => {
       // WHY THIS TEST MATTERS:
@@ -15,34 +13,32 @@ test.describe('Transfers — funds movement between own accounts', () => {
       // A silent failure here means customer sees incorrect balance
       // without any error, which is a critical trust issue.
 
-      const { accountId } = authenticatedPage;
-      const transfer = TransferFactory.valid(accountId, '13344');
-
+      const transfer = TransferFactory.valid('13122', '13344');
       await transferPage.navigate();
       await transferPage.transfer(transfer);
-
       await expectTransferConfirmed(transferPage.currentPage);
     }
   );
 
   test(
-    'should reject transfer when source account has insufficient funds',
+    '[BUG] should reject transfer when source account has insufficient funds',
     async ({ authenticatedPage, transferPage }) => {
       // WHY THIS TEST MATTERS:
-      // System must prevent overdraft. Silent approval of
-      // insufficient-funds transfer = financial loss.
+      // System must prevent overdraft. Parabank accepts transfers
+      // exceeding available balance without any error — confirmed bug.
+      // This test is expected to FAIL, documenting the vulnerability.
 
-      const { accountId } = authenticatedPage;
-      // Intento transferir más de lo que hay en la cuenta
-      const transfer = TransferFactory.withAmount(accountId, '13344', 999_999);
+      test.fail(true, 'Parabank allows overdraft: transfer of $999999 from account with insufficient funds was accepted silently');
 
       await transferPage.navigate();
-      await transferPage.transfer(transfer);
+      await transferPage.transfer(
+        TransferFactory.withAmount('13122', '13344', 999_999)
+      );
 
       await expect(
-        transferPage.currentPage.getByText(/insufficient/i),
+        transferPage.currentPage.getByText(/insufficient|error/i),
         'No error shown for insufficient funds transfer — ' +
-        'system may be allowing overdraft silently'
+        'system is allowing overdraft silently'
       ).toBeVisible();
     }
   );
@@ -54,15 +50,13 @@ test.describe('Transfers — funds movement between own accounts', () => {
       // Server accepts negative amounts (H-007, critical severity).
       // This test is expected to FAIL against current system,
       // demonstrating the framework finds real problems.
-      // Mark as known bug: test.fail() documents intent.
 
       test.fail(true, 'H-007: Server accepts negative transfer amounts — known critical bug');
 
-      const { accountId } = authenticatedPage;
-      const transfer = TransferFactory.withNegativeAmount(accountId, '13344');
-
       await transferPage.navigate();
-      await transferPage.transfer(transfer);
+      await transferPage.transfer(
+        TransferFactory.withNegativeAmount('13122', '13344')
+      );
 
       await expect(
         transferPage.currentPage.getByText(/invalid amount/i),

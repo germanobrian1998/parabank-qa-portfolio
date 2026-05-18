@@ -271,7 +271,22 @@ en otro lado.
   el diseño de fixtures paralelos
 - No se necesita lógica de re-autenticación entre tests paralelos
   por invalidación de sesión
+### H-010: Transferencias con saldo insuficiente son aceptadas
 
+**Fecha de verificación:** 16/05/2026
+**Método:** transferencia de $999,999 desde cuenta con saldo $1100
+
+**Evidencia:**
+- Request: transferencia de $999,999 desde cuenta 13122 (saldo $1100)
+- Response: "Transfer Complete! $999999.00 has been transferred"
+- El sistema no validó que el saldo fuera suficiente
+
+**Severidad de negocio:** Crítica
+Permite overdraft ilimitado sin autorización del cliente.
+
+**Impacto en estrategia de testing:**
+- Test 2 de transfers usa test.fail() igual que H-007
+- Confirma R1 del risk-based-strategy como bug real
 ---
 
 ## 6. Decisiones que este reporte informa
@@ -289,3 +304,4 @@ en otro lado.
 | H-008 confirmado: doble submit genera transacciones duplicadas | R1 confirmada como riesgo real; Page Objects implementan waitForNavigation post-submit para evitar duplicados accidentales |
 | H-009 confirmado: sesiones concurrentes no se invalidan | Tests paralelos pueden correr sin riesgo de invalidación mutua; fixtures no necesitan lógica de re-auth |
 | Validaciones de Bill Pay y saldo insuficiente pendientes | Se verifican en Fase 2 contra instancia Docker local; no bloquean inicio de implementación |
+| H-010 confirmado: transferencias con saldo insuficiente son aceptadas | Confirma R1 del risk-based-strategy como bug real; test usa test.fail() igual que H-007; el framework tiene ahora 3 bugs críticos documentados con evidencia antes de terminar Fase 2 |
