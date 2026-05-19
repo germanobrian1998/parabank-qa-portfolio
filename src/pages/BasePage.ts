@@ -1,3 +1,4 @@
+// src/pages/BasePage.ts
 import { Page, Locator } from '@playwright/test';
 
 export abstract class BasePage {
@@ -22,6 +23,14 @@ export abstract class BasePage {
     }
   }
 
+  protected async clickElement(
+    locator: Locator,
+    businessContext: string,
+    options?: { timeout?: number }
+  ): Promise<void> {
+    return this.clickWithRetry(locator, businessContext, options);
+  }
+
   protected async fillField(
     locator: Locator,
     value: string,
@@ -33,6 +42,21 @@ export abstract class BasePage {
     } catch (error) {
       throw new Error(
         `[Form] No se pudo completar el campo "${fieldName}". ` +
+        `Causa: ${(error as Error).message}`
+      );
+    }
+  }
+
+  protected async getTextContent(
+    locator: Locator,
+    fieldName: string
+  ): Promise<string> {
+    try {
+      const text = await locator.textContent({ timeout: 10_000 });
+      return text ?? '';
+    } catch (error) {
+      throw new Error(
+        `[${fieldName}] No se pudo obtener el texto del elemento. ` +
         `Causa: ${(error as Error).message}`
       );
     }
@@ -50,5 +74,12 @@ export abstract class BasePage {
         `URL actual: ${this.page.url()}`
       );
     }
+  }
+
+  protected async waitForUrl(
+    urlPattern: string | RegExp,
+    businessContext: string
+  ): Promise<void> {
+    return this.waitForNavigation(urlPattern, businessContext);
   }
 }

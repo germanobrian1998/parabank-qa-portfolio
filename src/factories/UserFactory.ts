@@ -15,9 +15,6 @@ export interface CustomerData {
 }
 
 export class UserFactory {
-  // Por qué un método base + overrides:
-  // Los tests necesitan datos válidos por defecto pero poder
-  // sobreescribir campos específicos para probar edge cases.
   static create(overrides: Partial<CustomerData> = {}): CustomerData {
     const base: CustomerData = {
       firstName: faker.person.firstName(),
@@ -34,8 +31,11 @@ export class UserFactory {
     return { ...base, ...overrides };
   }
 
-  // Para tests de edge case: usuario con nombre que tiene caracteres especiales
   static withSpecialCharacters(): CustomerData {
     return this.create({ firstName: "O'Brien", lastName: 'García-López' });
+  }
+
+  static withUsername(username: string): CustomerData {
+    return this.create({ username });
   }
 }
