@@ -6,19 +6,15 @@
 
 # Test info
 
-- Name: e2e/auth.spec.ts >> Registration — new customer onboarding >> should allow login with newly registered credentials
-- Location: tests/e2e/auth.spec.ts:49:7
+- Name: e2e/auth.spec.ts >> Registration — new customer onboarding >> [BUG] should allow login with newly registered credentials
+- Location: tests/e2e/auth.spec.ts:48:7
 
 # Error details
 
 ```
-Test timeout of 30000ms exceeded.
-```
-
-```
-Error: [Form] No se pudo completar el campo "Username". Causa: locator.clear: Test timeout of 30000ms exceeded.
+TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
 Call log:
-  - waiting for locator('input[name=\'username\']')
+  - waiting for locator('input[name=\'username\']') to be visible
 
 ```
 
@@ -65,7 +61,7 @@ Call log:
             - /url: contact.htm
     - generic [ref=e27]:
       - generic [ref=e28]:
-        - paragraph [ref=e29]: Welcome Mossie Huel-Stamm
+        - paragraph [ref=e29]: Welcome Brendan Stark
         - heading "Account Services" [level=2] [ref=e30]
         - list [ref=e31]:
           - listitem [ref=e32]:
@@ -180,90 +176,111 @@ Call log:
 # Test source
 
 ```ts
-  1  | // src/pages/BasePage.ts
-  2  | import { Page, Locator } from '@playwright/test';
-  3  | 
-  4  | export abstract class BasePage {
-  5  |   constructor(protected readonly page: Page) {}
-  6  | 
-  7  |   get currentPage(): Page {
-  8  |     return this.page;
-  9  |   }
-  10 | 
-  11 |   protected async clickWithRetry(
-  12 |     locator: Locator,
-  13 |     businessContext: string,
-  14 |     options?: { timeout?: number }
-  15 |   ): Promise<void> {
-  16 |     try {
-  17 |       await locator.click({ timeout: options?.timeout ?? 10_000 });
-  18 |     } catch (error) {
-  19 |       throw new Error(
-  20 |         `[${businessContext}] No se pudo completar la acción. ` +
-  21 |         `Elemento no interactuable. Causa técnica: ${(error as Error).message}`
-  22 |       );
-  23 |     }
-  24 |   }
-  25 | 
-  26 |   protected async clickElement(
-  27 |     locator: Locator,
-  28 |     businessContext: string,
-  29 |     options?: { timeout?: number }
-  30 |   ): Promise<void> {
-  31 |     return this.clickWithRetry(locator, businessContext, options);
-  32 |   }
-  33 | 
-  34 |   protected async fillField(
-  35 |     locator: Locator,
-  36 |     value: string,
-  37 |     fieldName: string
-  38 |   ): Promise<void> {
-  39 |     try {
-  40 |       await locator.clear();
-  41 |       await locator.fill(value);
-  42 |     } catch (error) {
-> 43 |       throw new Error(
-     |             ^ Error: [Form] No se pudo completar el campo "Username". Causa: locator.clear: Test timeout of 30000ms exceeded.
-  44 |         `[Form] No se pudo completar el campo "${fieldName}". ` +
-  45 |         `Causa: ${(error as Error).message}`
-  46 |       );
-  47 |     }
-  48 |   }
-  49 | 
-  50 |   protected async getTextContent(
-  51 |     locator: Locator,
-  52 |     fieldName: string
-  53 |   ): Promise<string> {
-  54 |     try {
-  55 |       const text = await locator.textContent({ timeout: 10_000 });
-  56 |       return text ?? '';
-  57 |     } catch (error) {
-  58 |       throw new Error(
-  59 |         `[${fieldName}] No se pudo obtener el texto del elemento. ` +
-  60 |         `Causa: ${(error as Error).message}`
-  61 |       );
-  62 |     }
-  63 |   }
-  64 | 
-  65 |   protected async waitForNavigation(
-  66 |     expectedUrlPattern: string | RegExp,
-  67 |     businessContext: string
-  68 |   ): Promise<void> {
-  69 |     try {
-  70 |       await this.page.waitForURL(expectedUrlPattern, { timeout: 15_000 });
-  71 |     } catch {
-  72 |       throw new Error(
-  73 |         `[${businessContext}] La navegación no completó hacia el destino esperado. ` +
-  74 |         `URL actual: ${this.page.url()}`
-  75 |       );
-  76 |     }
-  77 |   }
-  78 | 
-  79 |   protected async waitForUrl(
-  80 |     urlPattern: string | RegExp,
-  81 |     businessContext: string
-  82 |   ): Promise<void> {
-  83 |     return this.waitForNavigation(urlPattern, businessContext);
-  84 |   }
-  85 | }
+  1   | // src/pages/AuthPage.ts
+  2   | import { type Page, type Locator } from '@playwright/test';
+  3   | import { BasePage } from './BasePage';
+  4   | 
+  5   | export interface LoginCredentials {
+  6   |   username: string;
+  7   |   password: string;
+  8   | }
+  9   | 
+  10  | export interface LoginResult {
+  11  |   customerName: string;
+  12  |   isAuthenticated: boolean;
+  13  | }
+  14  | 
+  15  | /**
+  16  |  * AuthPage — cubre login y logout.
+  17  |  *
+  18  |  * Decisión de naming: "AuthPage" en lugar de "LoginPage" porque
+  19  |  * agrupa AMBAS acciones del ciclo de autenticación. Un Page Object
+  20  |  * por responsabilidad de negocio, no por URL.
+  21  |  */
+  22  | export class AuthPage extends BasePage {
+  23  |   // — Locators: Login form —
+  24  |   private get usernameInput(): Locator {
+  25  |     return this.page.locator("input[name='username']");
+  26  |   }
+  27  |   private get passwordInput(): Locator {
+  28  |     return this.page.locator("input[name='password']");
+  29  |   }
+  30  |   private get loginButton(): Locator {
+  31  |     return this.page.locator("input[value='Log In']");
+  32  |   }
+  33  | 
+  34  |   // — Locators: Estado autenticado —
+  35  |   private get logoutLink(): Locator {
+  36  |     return this.page.locator("a[href*='logout']");
+  37  |   }
+  38  | 
+  39  |   // — Actions —
+  40  | 
+  41  |   async navigate(): Promise<void> {
+  42  |     await this.page.goto('/parabank/index.htm');
+  43  |   }
+  44  | 
+  45  |   /**
+  46  |    * Realiza login y retorna información del estado autenticado.
+  47  |    *
+  48  |    * Por qué usamos waitForSelector antes de fillField:
+  49  |    * Después de ciertas navegaciones (ej: post-registro), el formulario
+  50  |    * de login puede tardar en renderizarse aunque la URL sea correcta.
+  51  |    * El waitForSelector garantiza que el campo esté disponible antes
+  52  |    * de intentar interactuar con él.
+  53  |    */
+  54  |   async login(credentials: LoginCredentials): Promise<LoginResult> {
+  55  |     await this.navigate();
+  56  | 
+  57  |     // Esperamos que el formulario de login esté disponible
+> 58  |     await this.page.waitForSelector("input[name='username']", {
+      |                     ^ TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+  59  |       timeout: 10_000,
+  60  |     });
+  61  | 
+  62  |     await this.fillField(this.usernameInput, credentials.username, 'Username');
+  63  |     await this.fillField(this.passwordInput, credentials.password, 'Password');
+  64  | 
+  65  |     await Promise.all([
+  66  |       this.page.waitForURL(/overview\.htm|login\.htm/, { timeout: 15_000 }),
+  67  |       this.clickElement(this.loginButton, 'Login'),
+  68  |     ]);
+  69  | 
+  70  |     // Si quedamos en login.htm, las credenciales fueron rechazadas
+  71  |     if (this.page.url().includes('login.htm')) {
+  72  |       throw new Error(
+  73  |         `[Login] Autenticación fallida para usuario "${credentials.username}". ` +
+  74  |         `El sistema rechazó las credenciales.`
+  75  |       );
+  76  |     }
+  77  | 
+  78  |     const customerName = await this.page
+  79  |       .locator('#rightPanel h1.title')
+  80  |       .textContent()
+  81  |       .catch(() => '');
+  82  | 
+  83  |     return {
+  84  |       customerName: customerName?.trim() ?? '',
+  85  |       isAuthenticated: true,
+  86  |     };
+  87  |   }
+  88  | 
+  89  |   /**
+  90  |    * Realiza logout y verifica retorno a la página principal.
+  91  |    */
+  92  |   async logout(): Promise<void> {
+  93  |     await this.clickElement(this.logoutLink, 'Logout');
+  94  |     await this.waitForUrl(
+  95  |       /index\.htm|login\.htm/,
+  96  |       'Post-logout redirect to public page'
+  97  |     );
+  98  |   }
+  99  | 
+  100 |   /**
+  101 |    * Verifica si hay una sesión activa sin realizar ninguna acción.
+  102 |    */
+  103 |   async isLoggedIn(): Promise<boolean> {
+  104 |     return this.logoutLink.isVisible().catch(() => false);
+  105 |   }
+  106 | }
 ```

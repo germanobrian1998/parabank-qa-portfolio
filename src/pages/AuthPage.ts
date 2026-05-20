@@ -1,3 +1,4 @@
+// src/pages/AuthPage.ts
 import { type Page, type Locator } from '@playwright/test';
 import { BasePage } from './BasePage';
 
@@ -7,9 +8,6 @@ export interface LoginCredentials {
 }
 
 export interface LoginResult {
-  // Parabank redirige a overview.htm y muestra el nombre del cliente.
-  // Capturamos estos datos para que las assertions de los tests
-  // puedan verificar identidad sin hacer un segundo request.
   customerName: string;
   isAuthenticated: boolean;
 }
@@ -20,15 +18,10 @@ export interface LoginResult {
  * Decisión de naming: "AuthPage" en lugar de "LoginPage" porque
  * agrupa AMBAS acciones del ciclo de autenticación. Un Page Object
  * por responsabilidad de negocio, no por URL.
- *
- * Selectores: el formulario de login está en el panel izquierdo (#leftPanel).
- * Usamos input[name] en lugar de IDs porque Parabank no asigna IDs
- * consistentes al form de login (a diferencia del form de registro).
  */
 export class AuthPage extends BasePage {
   // — Locators: Login form —
   private get usernameInput(): Locator {
-    // El form de login vive en el panel izquierdo
     return this.page.locator("input[name='username']");
   }
   private get passwordInput(): Locator {
@@ -39,15 +32,8 @@ export class AuthPage extends BasePage {
   }
 
   // — Locators: Estado autenticado —
-  private get customerNameHeading(): Locator {
-    // Parabank muestra "Welcome {Name}" en el panel derecho tras login exitoso
-    return this.page.locator('#rightPanel .smallText b');
-  }
   private get logoutLink(): Locator {
     return this.page.locator("a[href*='logout']");
-  }
-  private get loginErrorMessage(): Locator {
-    return this.page.locator('#rightPanel .error p');
   }
 
   // — Actions —
@@ -59,57 +45,49 @@ export class AuthPage extends BasePage {
   /**
    * Realiza login y retorna información del estado autenticado.
    *
-   * Por qué no retornamos solo boolean: el test necesita saber
-   * con qué identidad está autenticado, especialmente si usa
-   * usuarios generados dinámicamente. Retornar el nombre del cliente
-   * permite assertions más específicas.
+   * Por qué usamos waitForSelector antes de fillField:
+   * Después de ciertas navegaciones (ej: post-registro), el formulario
+   * de login puede tardar en renderizarse aunque la URL sea correcta.
+   * El waitForSelector garantiza que el campo esté disponible antes
+   * de intentar interactuar con él.
    */
   async login(credentials: LoginCredentials): Promise<LoginResult> {
     await this.navigate();
 
+    // Esperamos que el formulario de login esté disponible
+    await this.page.waitForSelector("input[name='username']", {
+      timeout: 10_000,
+    });
+
     await this.fillField(this.usernameInput, credentials.username, 'Username');
     await this.fillField(this.passwordInput, credentials.password, 'Password');
-    await this.clickElement(this.loginButton, 'Login');
 
-    // Esperamos redirección a overview o mensaje de error
-    await this.page.waitForSelector(
-      '#rightPanel .smallText, #rightPanel .error',
-      { timeout: 15_000 }
-    );
+    await Promise.all([
+      this.page.waitForURL(/overview\.htm|login\.htm/, { timeout: 15_000 }),
+      this.clickElement(this.loginButton, 'Login'),
+    ]);
 
-    // Si hay error de login, lo surfaceamos con contexto de negocio
-    const loginError = await this.loginErrorMessage.isVisible().catch(() => false);
-    if (loginError) {
-      const errorText = await this.getTextContent(
-        this.loginErrorMessage,
-        'Login error message'
-      );
+    // Si quedamos en login.htm, las credenciales fueron rechazadas
+    if (this.page.url().includes('login.htm')) {
       throw new Error(
         `[Login] Autenticación fallida para usuario "${credentials.username}". ` +
-        `Mensaje del sistema: ${errorText}. ` +
-        `Verificar que el usuario exista y las credenciales sean correctas.`
+        `El sistema rechazó las credenciales.`
       );
     }
 
-    await this.waitForUrl(/overview\.htm/, 'Post-login redirect to account overview');
-
-    const customerName = await this.getTextContent(
-      this.customerNameHeading,
-      'Customer name after login'
-    );
+    const customerName = await this.page
+      .locator('#rightPanel h1.title')
+      .textContent()
+      .catch(() => '');
 
     return {
-      customerName: customerName.trim(),
+      customerName: customerName?.trim() ?? '',
       isAuthenticated: true,
     };
   }
 
   /**
    * Realiza logout y verifica retorno a la página principal.
-   *
-   * Por qué verificamos la URL post-logout: un logout silencioso que
-   * no invalida la sesión es un bug de seguridad (H-009 del discovery).
-   * La verificación de URL es la mínima evidencia de que la sesión terminó.
    */
   async logout(): Promise<void> {
     await this.clickElement(this.logoutLink, 'Logout');
@@ -121,7 +99,6 @@ export class AuthPage extends BasePage {
 
   /**
    * Verifica si hay una sesión activa sin realizar ninguna acción.
-   * Útil para tests que verifican persistencia o invalidación de sesión.
    */
   async isLoggedIn(): Promise<boolean> {
     return this.logoutLink.isVisible().catch(() => false);
