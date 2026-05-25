@@ -1,7 +1,7 @@
 # Tech Discovery Report — Parabank
 
 **Fecha:** 2025-06  
-**Última actualización:** 24/05/2026  
+**Última actualización:** 25/05/2026  
 **Explorador:** QA Engineer (Portfolio Project)  
 **Sistema:** Parabank — Banking Demo Application  
 **URL:** https://parabank.parasoft.com  
@@ -143,6 +143,14 @@ UI o contra una instancia Docker local donde el endpoint sí está disponible.
 | Monto | jQuery — `isNaN` check | **Acepta montos negativos** (H-007 extendido a bill pay, confirmado 24/05/2026) | **Crítico** |
 | Monto cero | jQuery — no valida | **Acepta $0.00** (confirmado 24/05/2026) | Media |
 
+### 4.4 Formulario de solicitud de préstamo
+
+| Campo | Valida cliente | Valida servidor | Riesgo |
+|-------|---------------|-----------------|--------|
+| Monto del préstamo > 0 | Validación HTML (`min`) | **No valida server-side** — acepta montos negativos (H-015 confirmado) | **Crítico** |
+| Down payment | No validado en cliente | **No valida monto cero** — aprueba préstamos sin down payment (H-015 relacionado) | **Alto** |
+| Lógica de aprobación crediticia | N/A | Criterios de aprobación no documentados — comportamiento inconsistente bajo ciertas condiciones | Medio |
+
 ---
 
 ## 5. Observaciones de race conditions
@@ -268,6 +276,30 @@ Un atacante que bypasee la validación JavaScript podría enviar un número de c
 
 ---
 
+### H-015: El servidor acepta montos negativos en solicitud de préstamo
+
+**Fecha de verificación:** 25/05/2026  
+**Método:** formulario de solicitud de préstamo vía UI con monto negativo  
+**Severidad:** Crítica
+
+**Evidencia:**
+- Request con `amount=-500` en el formulario de loan request
+- El servidor procesa la solicitud sin rechazarla por validación
+- Respuesta incluye aprobación o denegación basada en lógica crediticia, ignorando el monto negativo
+
+**Comportamiento esperado:** el servidor debería rechazar cualquier solicitud de préstamo con monto ≤ 0 antes de evaluar la lógica crediticia.
+
+**Severidad de negocio:** Crítica.  
+Un monto negativo en una solicitud de préstamo podría generar deuda invertida o crédito no autorizado dependiendo de cómo el sistema contable procese el resultado aprobado.
+
+**Patrón:** consistente con H-007 (transfers) y H-007 extendido (bill pay) — el sistema no valida rangos numéricos server-side en ningún flujo financiero.
+
+**Impacto en automation:**
+- Test marcado `test.fail()` en loans.spec.ts
+- Confirma patrón sistémico de ausencia de validación numérica server-side
+
+---
+
 ## 7. Decisiones que este reporte informa
 
 | Hallazgo | Decisión arquitectónica que modifica |
@@ -280,7 +312,7 @@ Un atacante que bypasee la validación JavaScript podría enviar un número de c
 | Historial no se actualiza automáticamente | Los tests que verifican transacciones deben navegar explícitamente al historial, no asumir refresh automático |
 | Bill Pay usa jQuery show/hide con computedStyle | Detección de visibilidad requiere `getComputedStyle(el).display`, no `el.style.display` |
 | Navegar a overview.htm invalida sesión de bill pay | Tests de bill pay obtienen fromAccountId del select del formulario, no de AccountsPage.getAllAccounts() |
-| H-007 confirmado en transfers y bill pay | Test de monto negativo entra al smoke suite en ambos flujos; valida separación de API Client en ADR-003 |
+| H-007 confirmado en transfers, bill pay y loans | Patrón sistémico: el sistema no valida rangos numéricos server-side en ningún flujo financiero |
 | H-008 confirmado: doble submit genera transacciones duplicadas | R1 confirmada como riesgo real; Page Objects implementan waitForNavigation post-submit |
 | H-009 confirmado: sesiones concurrentes no se invalidan | Tests paralelos pueden correr sin riesgo de invalidación mutua |
 | H-010 confirmado: overdraft permitido | Confirma R1 del risk-based-strategy como bug real |
@@ -288,3 +320,4 @@ Un atacante que bypasee la validación JavaScript podría enviar un número de c
 | H-012 confirmado: campos vacíos aceptados en registro | Validación solo client-side confirmada |
 | H-013 confirmado: saldo inicial $100 en lugar de $0 | Documentado; puede ser comportamiento intencional del demo |
 | H-014 confirmado: mismatch de cuenta no validado server-side | Demuestra necesidad de tests de API directos que bypaseen validación JS |
+| H-015 confirmado: monto negativo en préstamo aceptado | Confirma patrón sistémico H-007; candidato prioritario para suite de API tests en Fase 3 |

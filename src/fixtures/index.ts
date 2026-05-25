@@ -1,13 +1,13 @@
 // src/fixtures/index.ts
-import { test as base,Page } from '@playwright/test';
+import { test as base, Page } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { TransferPage } from '../pages/TransferPage';
-// ... imports
 
 type Fixtures = {
   loginPage: LoginPage;
   transferPage: TransferPage;
   authenticatedPage: { page: Page; accountId: string };
+  authenticatedAsJohn: { page: Page };
 };
 
 export const test = base.extend<Fixtures>({
@@ -27,9 +27,18 @@ export const test = base.extend<Fixtures>({
     await loginPage.navigate();
     const accountInfo = await loginPage.login({
       username: 'john',
-      password: 'demo'
+      password: 'demo',
     });
     await use({ page, accountId: accountInfo.defaultAccountId });
+  },
+
+  // Fixture simple: login sin accountId
+  // Usado por tests que solo necesitan sesión activa (loans, billpay)
+  authenticatedAsJohn: async ({ page }, use) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.navigate();
+    await loginPage.login({ username: 'john', password: 'demo' });
+    await use({ page });
   },
 });
 
