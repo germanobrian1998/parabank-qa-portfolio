@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e/auth.spec.ts >> Registration — new customer onboarding >> [BUG] should reject registration with duplicate username
-- Location: tests/e2e/auth.spec.ts:75:7
+- Location: tests/e2e/auth.spec.ts:77:7
 
 # Error details
 
@@ -80,52 +80,52 @@ Resolved to value: undefined
         - paragraph [ref=e46]: If you have an account with us you can sign-up for free instant online access. You will have to provide some personal information.
         - table [ref=e48]:
           - rowgroup [ref=e49]:
-            - 'row "First Name: Audie" [ref=e50]':
+            - 'row "First Name: Ralph" [ref=e50]':
               - cell "First Name:" [ref=e51]
-              - cell "Audie" [ref=e52]:
-                - textbox [ref=e53]: Audie
+              - cell "Ralph" [ref=e52]:
+                - textbox [ref=e53]: Ralph
               - cell [ref=e54]
-            - 'row "Last Name: Sawayn" [ref=e55]':
+            - 'row "Last Name: Kuphal" [ref=e55]':
               - cell "Last Name:" [ref=e56]
-              - cell "Sawayn" [ref=e57]:
-                - textbox [ref=e58]: Sawayn
+              - cell "Kuphal" [ref=e57]:
+                - textbox [ref=e58]: Kuphal
               - cell [ref=e59]
-            - 'row "Address: 54275 N 6th Street" [ref=e60]':
+            - 'row "Address: 2857 Boehm Run" [ref=e60]':
               - cell "Address:" [ref=e61]
-              - cell "54275 N 6th Street" [ref=e62]:
-                - textbox [ref=e63]: 54275 N 6th Street
+              - cell "2857 Boehm Run" [ref=e62]:
+                - textbox [ref=e63]: 2857 Boehm Run
               - cell [ref=e64]
-            - 'row "City: Owensboro" [ref=e65]':
+            - 'row "City: Susanstead" [ref=e65]':
               - cell "City:" [ref=e66]
-              - cell "Owensboro" [ref=e67]:
-                - textbox [ref=e68]: Owensboro
+              - cell "Susanstead" [ref=e67]:
+                - textbox [ref=e68]: Susanstead
               - cell [ref=e69]
-            - 'row "State: MS" [ref=e70]':
+            - 'row "State: ND" [ref=e70]':
               - cell "State:" [ref=e71]
-              - cell "MS" [ref=e72]:
-                - textbox [ref=e73]: MS
+              - cell "ND" [ref=e72]:
+                - textbox [ref=e73]: ND
               - cell [ref=e74]
-            - 'row "Zip Code: 24336" [ref=e75]':
+            - 'row "Zip Code: 59170" [ref=e75]':
               - cell "Zip Code:" [ref=e76]
-              - cell "24336" [ref=e77]:
-                - textbox [ref=e78]: "24336"
+              - cell "59170" [ref=e77]:
+                - textbox [ref=e78]: "59170"
               - cell [ref=e79]
-            - 'row "Phone #: 733.478.1269 x02878" [ref=e80]':
+            - 'row "Phone #: 1-246-424-3371 x328" [ref=e80]':
               - 'cell "Phone #:" [ref=e81]'
-              - cell "733.478.1269 x02878" [ref=e82]:
-                - textbox [ref=e83]: 733.478.1269 x02878
+              - cell "1-246-424-3371 x328" [ref=e82]:
+                - textbox [ref=e83]: 1-246-424-3371 x328
               - cell [ref=e84]
-            - 'row "SSN: 836169370" [ref=e85]':
+            - 'row "SSN: 296462020" [ref=e85]':
               - cell "SSN:" [ref=e86]
-              - cell "836169370" [ref=e87]:
-                - textbox [ref=e88]: "836169370"
+              - cell "296462020" [ref=e87]:
+                - textbox [ref=e88]: "296462020"
               - cell [ref=e89]
             - row [ref=e90]:
               - cell [ref=e91]
-            - 'row "Username: dup_user_1779249052197 This username already exists." [ref=e92]':
+            - 'row "Username: dup_user_1779665597319 This username already exists." [ref=e92]':
               - cell "Username:" [ref=e93]
-              - cell "dup_user_1779249052197" [ref=e94]:
-                - textbox [ref=e95]: dup_user_1779249052197
+              - cell "dup_user_1779665597319" [ref=e94]:
+                - textbox [ref=e95]: dup_user_1779665597319
               - cell "This username already exists." [ref=e96]
             - row "Password:" [ref=e97]:
               - cell "Password:" [ref=e98]
@@ -232,155 +232,157 @@ Resolved to value: undefined
   45  |     ).toBe(newCustomer.username);
   46  |   });
   47  | 
-  48  |   test(
-  49  |   '[BUG] should allow login with newly registered credentials',
-  50  |   async ({ page }) => {
+  48  |   test("[BUG] should allow login with newly registered credentials", async ({
+  49  |     page,
+  50  |   }) => {
   51  |     // WHY THIS TEST MATTERS:
   52  |     // Registration and login must be consistent — a newly registered
   53  |     // user must be able to log in immediately after registration.
   54  |     // Parabank registers successfully but rejects login with same
   55  |     // credentials — confirmed bug.
   56  | 
-  57  |     test.fail(true, 'Parabank registers user successfully but rejects immediate login with same credentials');
-  58  | 
-  59  |     const registerPage = new RegisterPage(page);
-  60  |     const authPage = new AuthPage(page);
-  61  |     const newCustomer = UserFactory.create();
-  62  | 
-  63  |     await registerPage.navigate();
-  64  |     await registerPage.register(newCustomer);
+  57  |     test.fail(
+  58  |       true,
+  59  |       "Parabank registers user successfully but rejects immediate login with same credentials",
+  60  |     );
+  61  | 
+  62  |     const registerPage = new RegisterPage(page);
+  63  |     const authPage = new AuthPage(page);
+  64  |     const newCustomer = UserFactory.create();
   65  | 
-  66  |     const loginResult = await authPage.login({
-  67  |       username: newCustomer.username,
-  68  |       password: newCustomer.password,
-  69  |     });
-  70  | 
-  71  |     expect(loginResult.isAuthenticated).toBe(true);
-  72  |   }
-  73  | );
-  74  | 
-  75  |   test("[BUG] should reject registration with duplicate username", async ({
-  76  |     page,
-  77  |   }) => {
-  78  |     // WHY THIS TEST MATTERS:
-  79  |     // Duplicate usernames allow account confusion or takeover scenarios.
-  80  |     // A bank system must enforce unique identifiers at registration time.
-  81  |     // Parabank accepts duplicate usernames — confirmed security bug.
-  82  | 
-  83  |     test.fail(true, "Parabank accepts duplicate usernames — security bug");
+  66  |     await registerPage.navigate();
+  67  |     await registerPage.register(newCustomer);
+  68  | 
+  69  |     const loginResult = await authPage.login({
+  70  |       username: newCustomer.username,
+  71  |       password: newCustomer.password,
+  72  |     });
+  73  | 
+  74  |     expect(loginResult.isAuthenticated).toBe(true);
+  75  |   });
+  76  | 
+  77  |   test("[BUG] should reject registration with duplicate username", async ({
+  78  |     page,
+  79  |   }) => {
+  80  |     // WHY THIS TEST MATTERS:
+  81  |     // Duplicate usernames allow account confusion or takeover scenarios.
+  82  |     // A bank system must enforce unique identifiers at registration time.
+  83  |     // Parabank accepts duplicate usernames — confirmed security bug.
   84  | 
-  85  |     const registerPage = new RegisterPage(page);
-  86  |     const sharedUsername = `dup_user_${Date.now()}`;
-  87  | 
-  88  |     // Primer registro: debe tener éxito
-  89  |     await registerPage.navigate();
-  90  |     await registerPage.register(UserFactory.withUsername(sharedUsername));
-  91  | 
-  92  |     // Segundo registro con el mismo username: debe ser rechazado
-  93  |     await registerPage.navigate();
-  94  | 
-  95  |     await expect(async () => {
-  96  |       await registerPage.register(UserFactory.withUsername(sharedUsername));
-> 97  |     }).rejects.toThrow(/Registro rechazado/);
+  85  |     test.fail(true, "Parabank accepts duplicate usernames — security bug");
+  86  | 
+  87  |     const registerPage = new RegisterPage(page);
+  88  |     const sharedUsername = `dup_user_${Date.now()}`;
+  89  | 
+  90  |     // Primer registro: debe tener éxito
+  91  |     await registerPage.navigate();
+  92  |     await registerPage.register(UserFactory.withUsername(sharedUsername));
+  93  | 
+  94  |     // Segundo registro con el mismo username: debe ser rechazado
+  95  |     await registerPage.navigate();
+  96  | 
+  97  |     await expect(async () => {
+  98  |       await registerPage.register(UserFactory.withUsername(sharedUsername));
+> 99  |     }).rejects.toThrow(/Registro rechazado/);
       |                ^ Error: expect(received).rejects.toThrow()
-  98  |   });
-  99  | 
-  100 |   test("[BUG] should show validation error when required fields are empty", async ({
-  101 |     page,
-  102 |   }) => {
-  103 |     // WHY THIS TEST MATTERS:
-  104 |     // Empty field submission tests client-side AND server-side validation.
-  105 |     // If only client-side validation exists, API calls bypass it entirely.
-  106 |     // Parabank only validates client-side — confirmed validation gap.
-  107 | 
-  108 |     test.fail(
-  109 |       true,
-  110 |       "Parabank accepts registration with empty fields — server-side validation gap",
-  111 |     );
-  112 | 
-  113 |     const registerPage = new RegisterPage(page);
-  114 |     await registerPage.navigate();
-  115 | 
-  116 |     await expect(async () => {
-  117 |       await registerPage.register(
-  118 |         UserFactory.create({
-  119 |           firstName: "",
-  120 |           lastName: "",
-  121 |           username: "",
-  122 |           password: "",
-  123 |         }),
-  124 |       );
-  125 |     }).rejects.toThrow(/Registro rechazado/);
-  126 |   });
-  127 | });
-  128 | 
-  129 | test.describe("Login — customer authentication", () => {
-  130 |   test("should authenticate with valid credentials and show account overview @smoke", async ({
-  131 |     page,
-  132 |   }) => {
-  133 |     // WHY THIS TEST MATTERS:
-  134 |     // Login is the gateway to every financial operation.
-  135 |     // Failure here means zero operations can be performed.
-  136 |     // We use the demo account (john/demo) as stable fixture
-  137 |     // to avoid dependency on dynamic registration in smoke tests.
-  138 | 
-  139 |     const authPage = new AuthPage(page);
+  100 |   });
+  101 | 
+  102 |   test("[BUG] should show validation error when required fields are empty", async ({
+  103 |     page,
+  104 |   }) => {
+  105 |     // WHY THIS TEST MATTERS:
+  106 |     // Empty field submission tests client-side AND server-side validation.
+  107 |     // If only client-side validation exists, API calls bypass it entirely.
+  108 |     // Parabank only validates client-side — confirmed validation gap.
+  109 | 
+  110 |     test.fail(
+  111 |       true,
+  112 |       "Parabank accepts registration with empty fields — server-side validation gap",
+  113 |     );
+  114 | 
+  115 |     const registerPage = new RegisterPage(page);
+  116 |     await registerPage.navigate();
+  117 | 
+  118 |     await expect(async () => {
+  119 |       await registerPage.register(
+  120 |         UserFactory.create({
+  121 |           firstName: "",
+  122 |           lastName: "",
+  123 |           username: "",
+  124 |           password: "",
+  125 |         }),
+  126 |       );
+  127 |     }).rejects.toThrow(/Registro rechazado/);
+  128 |   });
+  129 | });
+  130 | 
+  131 | test.describe("Login — customer authentication", () => {
+  132 |   test("should authenticate with valid credentials and show account overview @smoke", async ({
+  133 |     page,
+  134 |   }) => {
+  135 |     // WHY THIS TEST MATTERS:
+  136 |     // Login is the gateway to every financial operation.
+  137 |     // Failure here means zero operations can be performed.
+  138 |     // We use the demo account (john/demo) as stable fixture
+  139 |     // to avoid dependency on dynamic registration in smoke tests.
   140 | 
-  141 |     const result = await authPage.login({
-  142 |       username: "john",
-  143 |       password: "demo",
-  144 |     });
-  145 | 
-  146 |     expect(
-  147 |       result.isAuthenticated,
-  148 |       'Demo user "john" could not authenticate — ' +
-  149 |         "system may be down or demo credentials changed",
-  150 |     ).toBe(true);
-  151 | 
-  152 |     expect(
-  153 |       page.url(),
-  154 |       "After login, user was not redirected to account overview — " +
-  155 |         "authenticated session may not have been established",
-  156 |     ).toContain("overview.htm");
-  157 |   });
-  158 | 
-  159 |   test("should reject login with incorrect password", async ({ page }) => {
-  160 |     // WHY THIS TEST MATTERS:
-  161 |     // Authentication must reject wrong passwords to prevent unauthorized access.
-  162 |     // A banking app that accepts any password is a critical security failure.
-  163 | 
-  164 |     const authPage = new AuthPage(page);
+  141 |     const authPage = new AuthPage(page);
+  142 | 
+  143 |     const result = await authPage.login({
+  144 |       username: "john",
+  145 |       password: "demo",
+  146 |     });
+  147 | 
+  148 |     expect(
+  149 |       result.isAuthenticated,
+  150 |       'Demo user "john" could not authenticate — ' +
+  151 |         "system may be down or demo credentials changed",
+  152 |     ).toBe(true);
+  153 | 
+  154 |     expect(
+  155 |       page.url(),
+  156 |       "After login, user was not redirected to account overview — " +
+  157 |         "authenticated session may not have been established",
+  158 |     ).toContain("overview.htm");
+  159 |   });
+  160 | 
+  161 |   test("should reject login with incorrect password", async ({ page }) => {
+  162 |     // WHY THIS TEST MATTERS:
+  163 |     // Authentication must reject wrong passwords to prevent unauthorized access.
+  164 |     // A banking app that accepts any password is a critical security failure.
   165 | 
-  166 |     await expect(async () => {
-  167 |       await authPage.login({
-  168 |         username: "john",
-  169 |         password: "WRONG_PASSWORD_123",
-  170 |       });
-  171 |     }).rejects.toThrow(/Autenticación fallida/);
-  172 |   });
-  173 | 
-  174 |   test("should reject login with non-existent username", async ({ page }) => {
-  175 |     // WHY THIS TEST MATTERS:
-  176 |     // The system must not leak information about which usernames exist.
-  177 |     // Ideally the error message is generic — same for wrong user and wrong password.
-  178 |     // This test verifies rejection; error message consistency is a separate concern.
-  179 | 
-  180 |     const authPage = new AuthPage(page);
+  166 |     const authPage = new AuthPage(page);
+  167 | 
+  168 |     await expect(async () => {
+  169 |       await authPage.login({
+  170 |         username: "john",
+  171 |         password: "WRONG_PASSWORD_123",
+  172 |       });
+  173 |     }).rejects.toThrow(/Autenticación fallida/);
+  174 |   });
+  175 | 
+  176 |   test("should reject login with non-existent username", async ({ page }) => {
+  177 |     // WHY THIS TEST MATTERS:
+  178 |     // The system must not leak information about which usernames exist.
+  179 |     // Ideally the error message is generic — same for wrong user and wrong password.
+  180 |     // This test verifies rejection; error message consistency is a separate concern.
   181 | 
-  182 |     await expect(async () => {
-  183 |       await authPage.login({
-  184 |         username: `ghost_user_${Date.now()}`,
-  185 |         password: "SomePassword1!",
-  186 |       });
-  187 |     }).rejects.toThrow(/Autenticación fallida/);
-  188 |   });
-  189 | 
-  190 |   test("should reject login with empty credentials", async ({ page }) => {
-  191 |     // WHY THIS TEST MATTERS:
-  192 |     // Empty credential submission should never succeed.
-  193 |     // Verifies that the form doesn't bypass validation on empty submit.
-  194 | 
-  195 |     const authPage = new AuthPage(page);
+  182 |     const authPage = new AuthPage(page);
+  183 | 
+  184 |     await expect(async () => {
+  185 |       await authPage.login({
+  186 |         username: `ghost_user_${Date.now()}`,
+  187 |         password: "SomePassword1!",
+  188 |       });
+  189 |     }).rejects.toThrow(/Autenticación fallida/);
+  190 |   });
+  191 | 
+  192 |   test("should reject login with empty credentials", async ({ page }) => {
+  193 |     // WHY THIS TEST MATTERS:
+  194 |     // Empty credential submission should never succeed.
+  195 |     // Verifies that the form doesn't bypass validation on empty submit.
   196 | 
-  197 |     await expect(async () => {
+  197 |     const authPage = new AuthPage(page);
+  198 | 
+  199 |     await expect(async () => {
 ```

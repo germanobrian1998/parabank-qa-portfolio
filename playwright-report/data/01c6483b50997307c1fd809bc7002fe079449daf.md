@@ -12,16 +12,13 @@
 # Error details
 
 ```
-TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
-Call log:
-  - waiting for locator('input[name=\'username\']') to be visible
-
+Error: [Login] Autenticación fallida para usuario "Maverick_Lindgren745106". El sistema rechazó las credenciales.
 ```
 
 # Page snapshot
 
 ```yaml
-- generic [active] [ref=e1]:
+- generic [ref=e1]:
   - generic [ref=e2]:
     - generic [ref=e3]:
       - link:
@@ -61,115 +58,61 @@ Call log:
             - /url: contact.htm
     - generic [ref=e27]:
       - generic [ref=e28]:
-        - paragraph [ref=e29]: Welcome Brendan Stark
-        - heading "Account Services" [level=2] [ref=e30]
-        - list [ref=e31]:
-          - listitem [ref=e32]:
-            - link "Open New Account" [ref=e33] [cursor=pointer]:
-              - /url: openaccount.htm
-          - listitem [ref=e34]:
-            - link "Accounts Overview" [ref=e35] [cursor=pointer]:
-              - /url: overview.htm
-          - listitem [ref=e36]:
-            - link "Transfer Funds" [ref=e37] [cursor=pointer]:
-              - /url: transfer.htm
-          - listitem [ref=e38]:
-            - link "Bill Pay" [ref=e39] [cursor=pointer]:
-              - /url: billpay.htm
-          - listitem [ref=e40]:
-            - link "Find Transactions" [ref=e41] [cursor=pointer]:
-              - /url: findtrans.htm
-          - listitem [ref=e42]:
-            - link "Update Contact Info" [ref=e43] [cursor=pointer]:
-              - /url: updateprofile.htm
-          - listitem [ref=e44]:
-            - link "Request Loan" [ref=e45] [cursor=pointer]:
-              - /url: requestloan.htm
-          - listitem [ref=e46]:
-            - link "Log Out" [ref=e47] [cursor=pointer]:
-              - /url: logout.htm
-      - generic [ref=e48]:
-        - list [ref=e50]:
-          - listitem [ref=e51]: ATM Services
-          - listitem [ref=e52]:
-            - link "Withdraw Funds" [ref=e53] [cursor=pointer]:
-              - /url: services/ParaBank?wsdl
-          - listitem [ref=e54]:
-            - link "Transfer Funds" [ref=e55] [cursor=pointer]:
-              - /url: services/ParaBank?wsdl
-          - listitem [ref=e56]:
-            - link "Check Balances" [ref=e57] [cursor=pointer]:
-              - /url: services/ParaBank?wsdl
-          - listitem [ref=e58]:
-            - link "Make Deposits" [ref=e59] [cursor=pointer]:
-              - /url: services/ParaBank?wsdl
-        - list [ref=e60]:
-          - listitem [ref=e61]: Online Services
-          - listitem [ref=e62]:
-            - link "Bill Pay" [ref=e63] [cursor=pointer]:
-              - /url: services/bank?_wadl&_type=xml
-          - listitem [ref=e64]:
-            - link "Account History" [ref=e65] [cursor=pointer]:
-              - /url: services/bank?_wadl&_type=xml
-          - listitem [ref=e66]:
-            - link "Transfer Funds" [ref=e67] [cursor=pointer]:
-              - /url: services/bank?_wadl&_type=xml
-        - paragraph [ref=e68]:
-          - link "Read More" [ref=e69] [cursor=pointer]:
-            - /url: services.htm
-        - heading "Latest News" [level=4] [ref=e70]
-        - list [ref=e71]:
-          - listitem [ref=e72]: 05/16/2026
-          - listitem [ref=e73]:
-            - link "ParaBank Is Now Re-Opened" [ref=e74] [cursor=pointer]:
-              - /url: news.htm#6
-          - listitem [ref=e75]:
-            - link "New! Online Bill Pay" [ref=e76] [cursor=pointer]:
-              - /url: news.htm#5
-          - listitem [ref=e77]:
-            - link "New! Online Account Transfers" [ref=e78] [cursor=pointer]:
-              - /url: news.htm#4
-        - paragraph [ref=e79]:
-          - link "Read More" [ref=e80] [cursor=pointer]:
-            - /url: news.htm
-  - generic [ref=e82]:
-    - list [ref=e83]:
-      - listitem [ref=e84]:
-        - link "Home" [ref=e85] [cursor=pointer]:
+        - heading "Customer Login" [level=2] [ref=e29]
+        - generic [ref=e30]:
+          - generic [ref=e31]:
+            - paragraph [ref=e32]: Username
+            - textbox [active] [ref=e34]
+            - paragraph [ref=e35]: Password
+            - textbox [ref=e37]
+            - button "Log In" [ref=e39] [cursor=pointer]
+          - paragraph [ref=e40]:
+            - link "Forgot login info?" [ref=e41] [cursor=pointer]:
+              - /url: lookup.htm
+          - paragraph [ref=e42]:
+            - link "Register" [ref=e43] [cursor=pointer]:
+              - /url: register.htm
+      - generic [ref=e44]:
+        - heading "Error!" [level=1] [ref=e45]
+        - paragraph [ref=e46]: The username and password could not be verified.
+  - generic [ref=e48]:
+    - list [ref=e49]:
+      - listitem [ref=e50]:
+        - link "Home" [ref=e51] [cursor=pointer]:
           - /url: index.htm
         - text: "|"
-      - listitem [ref=e86]:
-        - link "About Us" [ref=e87] [cursor=pointer]:
+      - listitem [ref=e52]:
+        - link "About Us" [ref=e53] [cursor=pointer]:
           - /url: about.htm
         - text: "|"
-      - listitem [ref=e88]:
-        - link "Services" [ref=e89] [cursor=pointer]:
+      - listitem [ref=e54]:
+        - link "Services" [ref=e55] [cursor=pointer]:
           - /url: services.htm
         - text: "|"
-      - listitem [ref=e90]:
-        - link "Products" [ref=e91] [cursor=pointer]:
+      - listitem [ref=e56]:
+        - link "Products" [ref=e57] [cursor=pointer]:
           - /url: http://www.parasoft.com/jsp/products.jsp
         - text: "|"
-      - listitem [ref=e92]:
-        - link "Locations" [ref=e93] [cursor=pointer]:
+      - listitem [ref=e58]:
+        - link "Locations" [ref=e59] [cursor=pointer]:
           - /url: http://www.parasoft.com/jsp/pr/contacts.jsp
         - text: "|"
-      - listitem [ref=e94]:
-        - link "Forum" [ref=e95] [cursor=pointer]:
+      - listitem [ref=e60]:
+        - link "Forum" [ref=e61] [cursor=pointer]:
           - /url: http://forums.parasoft.com/
         - text: "|"
-      - listitem [ref=e96]:
-        - link "Site Map" [ref=e97] [cursor=pointer]:
+      - listitem [ref=e62]:
+        - link "Site Map" [ref=e63] [cursor=pointer]:
           - /url: sitemap.htm
         - text: "|"
-      - listitem [ref=e98]:
-        - link "Contact Us" [ref=e99] [cursor=pointer]:
+      - listitem [ref=e64]:
+        - link "Contact Us" [ref=e65] [cursor=pointer]:
           - /url: contact.htm
-    - paragraph [ref=e100]: © Parasoft. All rights reserved.
-    - list [ref=e101]:
-      - listitem [ref=e102]: "Visit us at:"
-      - listitem [ref=e103]:
-        - link "www.parasoft.com" [ref=e104] [cursor=pointer]:
+    - paragraph [ref=e66]: © Parasoft. All rights reserved.
+    - list [ref=e67]:
+      - listitem [ref=e68]: "Visit us at:"
+      - listitem [ref=e69]:
+        - link "www.parasoft.com" [ref=e70] [cursor=pointer]:
           - /url: http://www.parasoft.com/
 ```
 
@@ -233,8 +176,7 @@ Call log:
   55  |     await this.navigate();
   56  | 
   57  |     // Esperamos que el formulario de login esté disponible
-> 58  |     await this.page.waitForSelector("input[name='username']", {
-      |                     ^ TimeoutError: page.waitForSelector: Timeout 10000ms exceeded.
+  58  |     await this.page.waitForSelector("input[name='username']", {
   59  |       timeout: 10_000,
   60  |     });
   61  | 
@@ -248,7 +190,8 @@ Call log:
   69  | 
   70  |     // Si quedamos en login.htm, las credenciales fueron rechazadas
   71  |     if (this.page.url().includes('login.htm')) {
-  72  |       throw new Error(
+> 72  |       throw new Error(
+      |             ^ Error: [Login] Autenticación fallida para usuario "Maverick_Lindgren745106". El sistema rechazó las credenciales.
   73  |         `[Login] Autenticación fallida para usuario "${credentials.username}". ` +
   74  |         `El sistema rechazó las credenciales.`
   75  |       );

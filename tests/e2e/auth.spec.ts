@@ -45,16 +45,19 @@ test.describe("Registration — new customer onboarding", () => {
     ).toBe(newCustomer.username);
   });
 
-  test(
-  '[BUG] should allow login with newly registered credentials',
-  async ({ page }) => {
+  test("[BUG] should allow login with newly registered credentials", async ({
+    page,
+  }) => {
     // WHY THIS TEST MATTERS:
     // Registration and login must be consistent — a newly registered
     // user must be able to log in immediately after registration.
     // Parabank registers successfully but rejects login with same
     // credentials — confirmed bug.
 
-    test.fail(true, 'Parabank registers user successfully but rejects immediate login with same credentials');
+    test.fail(
+      true,
+      "Parabank registers user successfully but rejects immediate login with same credentials",
+    );
 
     const registerPage = new RegisterPage(page);
     const authPage = new AuthPage(page);
@@ -69,8 +72,7 @@ test.describe("Registration — new customer onboarding", () => {
     });
 
     expect(loginResult.isAuthenticated).toBe(true);
-  }
-);
+  });
 
   test("[BUG] should reject registration with duplicate username", async ({
     page,
