@@ -1,0 +1,168 @@
+# .github/workflows/ci.yml
+#
+# CI pipeline para el portfolio QA de Parabank.
+#
+# ARQUITECTURA DE JOBS:
+#
+#   smoke (< 3 min) ──► full (< 15 min)
+#
+# El job `smoke` actúa como gate: solo si pasa, se ejecuta `full`.
+# Esto permite feedback rápido en PRs sin esperar la suite completa.
+#
+# IMAGEN DOCKER:
+# Se usa la imagen oficial `parasoft/parabank:latest` publicada por Parasoft en
+# Docker Hub. No hay Dockerfile en el repo — no es necesario.
+# Puerto interno del contenedor: 8080 → mapeado a 9090 del host
+# para coincidir con baseURL en playwright.config.ts (http://localhost:9090).
+#
+# HEALTH CHECK:
+# Parabank tarda ~30-60s en iniciar (Tomcat + HSQLDB). El step de wait-on
+# hace polling al endpoint raíz antes de pasar los tests, evitando falsos
+# negativos por "connection refused" al inicio.
+
+name: QA — Playwright Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Job 1: Smoke ──────────────────────────────────────────────────────────
+  # Corre solo tests @smoke. Objetivo: < 3 minutos.
+  # Bloquea el merge si falla.
+
+  smoke:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Parabank Docker container
+        run: |
+          docker run -d \
+            --name parabank \
+            -p 9090:8080 \
+            parasoft/parabank:latest
+
+      - name: Wait for Parabank to be ready
+        # Hace polling cada 5s hasta que el servidor responde 200.
+        # Timeout de 90s — Parabank tarda ~30-60s en levantar Tomcat + HSQLDB.
+        run: |
+          echo "Waiting for Parabank to be available at http://localhost:9090..."
+          for i in $(seq 1 18); do
+            if curl -sf http://localhost:9090/parabank/index.htm > /dev/null; then
+              echo "Parabank is ready after $((i * 5))s"
+              exit 0
+            fi
+            echo "  attempt $i/18 — not ready yet, waiting 5s..."
+            sleep 5
+          done
+          echo "ERROR: Parabank did not start within 90 seconds"
+          docker logs parabank
+          exit 1
+
+      - name: Run smoke tests
+        run: npx playwright test --grep "@smoke" --reporter=html
+        env:
+          CI: true
+
+      - name: Upload smoke test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ─── Job 2: Full Suite ─────────────────────────────────────────────────────
+  # Corre todos los tests. Objetivo: < 15 minutos.
+  # Solo se ejecuta si smoke pasa — no bloquea el merge por sí mismo,
+  # pero registra el estado de la suite completa.
+
+  full:
+    name: Full Test Suite
+    runs-on: ubuntu-latest
+    needs: smoke
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers and system dependencies
+        # Full suite corre en los tres browsers para detectar inconsistencias
+        run: npx playwright install --with-deps
+
+      - name: Start Parabank Docker container
+        run: |
+          docker run -d \
+            --name parabank \
+            -p 9090:8080 \
+            parasoft/parabank:latest
+
+      - name: Wait for Parabank to be ready
+        run: |
+          echo "Waiting for Parabank to be available at http://localhost:9090..."
+          for i in $(seq 1 18); do
+            if curl -sf http://localhost:9090/parabank/index.htm > /dev/null; then
+              echo "Parabank is ready after $((i * 5))s"
+              exit 0
+            fi
+            echo "  attempt $i/18 — not ready yet, waiting 5s..."
+            sleep 5
+          done
+          echo "ERROR: Parabank did not start within 90 seconds"
+          docker logs parabank
+          exit 1
+
+      - name: Run full test suite
+        # --reporter=html,github genera reporte HTML + anotaciones nativas en el
+        # PR (checks con detalles de cada test fallido).
+        run: npx playwright test --reporter=html,github
+        env:
+          CI: true
+
+      - name: Upload full test report
+        # `if: always()` asegura que el reporte se sube incluso si los tests
+        # fallan — crítico para debugging post-run.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-report-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload test results (JUnit XML)
+        # El XML permite a GitHub mostrar el resumen de tests en la UI del PR.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_number }}
+          path: test-results/
+          retention-days: 14

@@ -1,7 +1,7 @@
 # Tech Discovery Report — Parabank
 
 **Fecha:** 2025-06  
-**Última actualización:** 25/05/2026  
+**Última actualización:** 26/05/2026  
 **Explorador:** QA Engineer (Portfolio Project)  
 **Sistema:** Parabank — Banking Demo Application  
 **URL:** https://parabank.parasoft.com  
@@ -44,7 +44,17 @@ Los endpoints no tienen un formato de error unificado. Algunos devuelven XML, ot
 
 **Impacto:** el API Client debe establecer `Content-Type: application/json` y `Accept: application/json` en cada request, no asumir defaults.
 
-### 2.3 Endpoints sin equivalente en UI
+### 2.3 Respuestas de texto plano (confirmado 26/05/2026)
+
+Algunos endpoints devuelven texto plano en lugar de JSON, incluso con `Accept: application/json`:
+
+| Endpoint | Respuesta real |
+|----------|---------------|
+| `POST /transfer` | `"Successfully transferred $X from account #A to account #B"` |
+
+**Impacto en automation:** el API Client debe intentar parsear JSON y hacer fallback a texto plano si el parse falla. No asumir que `Accept: application/json` garantiza respuesta JSON.
+
+### 2.4 Endpoints sin equivalente en UI
 
 | Endpoint API | ¿Tiene UI equivalente? | Nota |
 |-------------|----------------------|------|
@@ -175,7 +185,8 @@ UI o contra una instancia Docker local donde el endpoint sí está disponible.
 
 **Fecha de verificación:** 13/05/2026  
 **Extendido a Bill Pay:** 24/05/2026  
-**Método:** curl directo al endpoint REST (transfers); jQuery trigger con monto negativo (bill pay)
+**Confirmado a nivel API:** 26/05/2026  
+**Método:** curl directo al endpoint REST (transfers); jQuery trigger con monto negativo (bill pay); API test directo (transfer.api.spec.ts)
 
 **Evidencia (transfers):**
 - Request: `POST /transfer?fromAccountId=13344&toAccountId=13566&amount=-100`
@@ -191,8 +202,8 @@ UI o contra una instancia Docker local donde el endpoint sí está disponible.
 **Severidad de negocio:** Crítica.
 
 **Impacto en automation:**
-- Test de monto negativo en bill pay marcado `test.fail()` como H-007 (bug confirmado)
-- Consistente con el hallazgo de transfers — afecta múltiples flujos financieros
+- Test de monto negativo marcado `test.fail()` en transfer.spec.ts, billpay.spec.ts y transfer.api.spec.ts
+- Patrón sistémico confirmado — afecta todos los flujos financieros
 
 ---
 
@@ -204,27 +215,38 @@ UI o contra una instancia Docker local donde el endpoint sí está disponible.
 
 ---
 
-### H-009: Sesiones concurrentes no se invalidan
+### H-009: Sesión no invalidada post-logout
 
 **Fecha de verificación:** 13/05/2026  
+**Confirmado a nivel API:** 26/05/2026  
 **Severidad:** Media  
-**Estado:** Confirmado — test.fail() en auth.spec.ts y accounts.spec.ts
+**Estado:** Confirmado — test.fail() en auth.spec.ts, accounts.spec.ts, billpay.spec.ts y login.api.spec.ts
+
+**Nota:** confirmado tanto en UI como en API directa. El JSESSIONID permanece válido en el servidor tras el logout, independientemente del canal de acceso.
 
 ---
 
 ### H-010: Transferencias con saldo insuficiente son aceptadas
 
 **Fecha de verificación:** 16/05/2026  
+**Confirmado a nivel API:** 26/05/2026  
 **Severidad:** Crítica  
-**Estado:** Confirmado — test.fail() en transfer.spec.ts
+**Estado:** Confirmado — test.fail() en transfer.spec.ts y transfer.api.spec.ts
+
+**Nota:** confirmado tanto en UI como en API directa. El servidor no consulta el saldo disponible antes de ejecutar la transferencia.
 
 ---
 
-### H-011: Parabank acepta registro con username duplicado
+### H-011: La UI acepta registro con username duplicado — el servidor sí lo rechaza
 
-**Fecha de verificación:** 16/05/2026  
-**Severidad:** Alta  
-**Estado:** Confirmado — test.fail() en auth.spec.ts
+**Fecha de verificación UI:** 16/05/2026  
+**Verificación API:** 26/05/2026 — **servidor rechaza correctamente**  
+**Severidad:** Alta (UI) / No aplica (API)  
+**Estado:** test.fail() en auth.spec.ts (UI); test passing sin test.fail() en login.api.spec.ts (API)
+
+**Aclaración importante (26/05/2026):** al verificar vía API directa, el servidor **sí rechaza** el intento de registro con username duplicado. El bug es exclusivo de la capa UI — el formulario permite el submit y muestra un estado de éxito incorrecto sin consultar correctamente la respuesta del servidor.
+
+**Impacto:** la validación server-side existe pero la UI no la procesa correctamente. Fix probable en el manejo del response en el frontend, no en el backend.
 
 ---
 
@@ -304,20 +326,20 @@ Un monto negativo en una solicitud de préstamo podría generar deuda invertida 
 
 | Hallazgo | Decisión arquitectónica que modifica |
 |----------|-------------------------------------|
-| La API usa session cookies, no JWT | El API Client debe gestionar cookies explícitamente con `storageState` de Playwright o un cookie jar manual |
+| La API usa session cookies, no JWT | El API Client gestiona cookies via APIRequestContext de Playwright sin baseURL; URLs absolutas en cada request |
 | `GET /loan` tiene efecto lateral | Los tests de API de préstamos NO pueden usar retry automático; se necesita idempotency guard explícito |
 | Estado de BD compartido en demo público | Todos los tests E2E corren contra instancia Docker local; el ambiente público se usa solo para exploración manual |
 | Saldos iniciales variables | Los tests no pueden asumir saldos hardcodeados; deben consultar el saldo actual via API antes de calcular montos de transferencia |
-| No hay formato de error unificado | El API Client necesita una capa de normalización de errores antes de llegar a las assertions |
+| No hay formato de error unificado | El API Client implementa fallback: intenta JSON, retorna texto plano si falla |
 | Historial no se actualiza automáticamente | Los tests que verifican transacciones deben navegar explícitamente al historial, no asumir refresh automático |
 | Bill Pay usa jQuery show/hide con computedStyle | Detección de visibilidad requiere `getComputedStyle(el).display`, no `el.style.display` |
 | Navegar a overview.htm invalida sesión de bill pay | Tests de bill pay obtienen fromAccountId del select del formulario, no de AccountsPage.getAllAccounts() |
-| H-007 confirmado en transfers, bill pay y loans | Patrón sistémico: el sistema no valida rangos numéricos server-side en ningún flujo financiero |
+| H-007 confirmado en UI y API (transfers, bill pay, loans) | Patrón sistémico: el sistema no valida rangos numéricos server-side en ningún flujo financiero |
 | H-008 confirmado: doble submit genera transacciones duplicadas | R1 confirmada como riesgo real; Page Objects implementan waitForNavigation post-submit |
-| H-009 confirmado: sesiones concurrentes no se invalidan | Tests paralelos pueden correr sin riesgo de invalidación mutua |
-| H-010 confirmado: overdraft permitido | Confirma R1 del risk-based-strategy como bug real |
-| H-011 confirmado: username duplicado aceptado | Candidato a test de API en Fase 3 para verificar constraint de unicidad |
+| H-009 confirmado en UI y API: sesión no se invalida post-logout | Confirmado en ambas capas — el JSESSIONID persiste en el servidor independientemente del canal |
+| H-010 confirmado en UI y API: overdraft permitido | Confirmado en ambas capas — el servidor no consulta saldo antes de ejecutar la transferencia |
+| H-011 aclarado: bug solo en UI, servidor rechaza correctamente | Fix probable en el manejo del response en el frontend; no requiere cambio de backend |
 | H-012 confirmado: campos vacíos aceptados en registro | Validación solo client-side confirmada |
 | H-013 confirmado: saldo inicial $100 en lugar de $0 | Documentado; puede ser comportamiento intencional del demo |
 | H-014 confirmado: mismatch de cuenta no validado server-side | Demuestra necesidad de tests de API directos que bypaseen validación JS |
-| H-015 confirmado: monto negativo en préstamo aceptado | Confirma patrón sistémico H-007; candidato prioritario para suite de API tests en Fase 3 |
+| H-015 confirmado: monto negativo en préstamo aceptado | Confirma patrón sistémico H-007 |
