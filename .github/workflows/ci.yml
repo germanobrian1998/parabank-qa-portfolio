@@ -10,8 +10,9 @@
 # Esto permite feedback rápido en PRs sin esperar la suite completa.
 #
 # IMAGEN DOCKER:
-# Se usa la imagen oficial `parasoft/parabank:latest` publicada por Parasoft en
-# Docker Hub. No hay Dockerfile en el repo — no es necesario.
+# Se usa la imagen `germanobrian1998/parabank:latest` — imagen custom con BD
+# pre-seeded (credenciales john/demo) publicada en Docker Hub.
+# No hay Dockerfile en el repo — no es necesario.
 # Puerto interno del contenedor: 8080 → mapeado a 9090 del host
 # para coincidir con baseURL en playwright.config.ts (http://localhost:9090).
 #
@@ -59,7 +60,7 @@ jobs:
           docker run -d \
             --name parabank \
             -p 9090:8080 \
-            parasoft/parabank:latest
+            germanobrian1998/parabank:latest
 
       - name: Wait for Parabank to be ready
         # Hace polling cada 5s hasta que el servidor responde 200.
@@ -124,7 +125,7 @@ jobs:
           docker run -d \
             --name parabank \
             -p 9090:8080 \
-            parasoft/parabank:latest
+            germanobrian1998/parabank:latest
 
       - name: Wait for Parabank to be ready
         run: |
