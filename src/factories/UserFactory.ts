@@ -23,9 +23,9 @@ export class UserFactory {
       city: faker.location.city(),
       state: faker.location.state({ abbreviated: true }),
       zipCode: faker.location.zipCode('#####'),
-      phone: faker.phone.number(),
+      phone: faker.string.numeric(10),
       ssn: faker.string.numeric(9),
-      username: faker.internet.username() + faker.string.numeric(4),
+      username: `u${Date.now()}${faker.string.numeric(6)}`,
       password: 'Test@' + faker.string.alphanumeric(8),
     };
     return { ...base, ...overrides };
