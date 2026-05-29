@@ -82,6 +82,7 @@ test.describe("Bill Pay — happy path", () => {
     const paymentData = BillPayFactory.withAmount(fromAccountId, paymentAmount);
 
     await billPayPage.payBill(paymentData);
+    await page.waitForTimeout(2000);
 
     const { balance: balanceAfter } =
       await accountsPage.getAccountBalance(fromAccountId);
