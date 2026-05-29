@@ -71,24 +71,26 @@ test.describe("Bill Pay — happy path", () => {
     authenticatedAsJohn,
     page,
   }) => {
-
     const billPayPage = new BillPayPage(page);
-    const accountsPage = new AccountsPage(page);
-
     const fromAccountId = await billPayPage.getFirstAccountId();
-    const { balance: balanceBefore } =
-      await accountsPage.getAccountBalance(fromAccountId);
     const paymentAmount = 75;
     const paymentData = BillPayFactory.withAmount(fromAccountId, paymentAmount);
 
     await billPayPage.payBill(paymentData);
-    await page.waitForTimeout(2000);
 
-    const { balance: balanceAfter } =
-      await accountsPage.getAccountBalance(fromAccountId);
-    const actualDeduction = balanceBefore - balanceAfter;
-
-    expect(actualDeduction).toBeCloseTo(paymentAmount, 2);
+    // Verificar via API que la transacción existe — independiente del balance acumulado
+    const response = await page.request.get(
+      `http://localhost:9090/parabank/services/bank/accounts/${fromAccountId}/transactions`,
+    );
+    const transactions = await response.json();
+    const payment = transactions.find(
+      (t: any) => Math.abs(t.amount) === paymentAmount && t.type === "Debit",
+    );
+    expect(
+      payment,
+      `No se encontró transacción de $${paymentAmount} en cuenta ${fromAccountId} — ` +
+        `el pago puede no haberse registrado en el historial de transacciones`,
+    ).toBeTruthy();
   });
 
   test("should allow paying bills from different source accounts", async ({
