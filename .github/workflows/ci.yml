@@ -41,12 +41,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install Node dependencies
@@ -86,7 +86,7 @@ jobs:
 
       - name: Upload smoke test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: smoke-report
           path: playwright-report/
@@ -105,12 +105,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install Node dependencies
@@ -153,7 +153,7 @@ jobs:
         # `if: always()` asegura que el reporte se sube incluso si los tests
         # fallan — crítico para debugging post-run.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: full-report-${{ github.run_number }}
           path: playwright-report/
@@ -162,7 +162,7 @@ jobs:
       - name: Upload test results (JUnit XML)
         # El XML permite a GitHub mostrar el resumen de tests en la UI del PR.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-results-${{ github.run_number }}
           path: test-results/
