@@ -81,6 +81,7 @@ test.describe("Bill Pay — happy path", () => {
     // Verificar via API que la transacción existe — independiente del balance acumulado
     const response = await page.request.get(
       `http://localhost:9090/parabank/services/bank/accounts/${fromAccountId}/transactions`,
+      { headers: { Accept: "application/json" } },
     );
     const transactions = await response.json();
     const payment = transactions.find(
