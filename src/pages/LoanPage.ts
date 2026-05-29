@@ -1,7 +1,7 @@
 // src/pages/LoanPage.ts
-import { Page } from '@playwright/test';
-import { BasePage } from './BasePage';
-import { LoanRequest } from '../factories/LoanFactory';
+import { Page } from "@playwright/test";
+import { BasePage } from "./BasePage";
+import { LoanRequest } from "../factories/LoanFactory";
 
 export interface LoanResult {
   approved: boolean;
@@ -11,39 +11,51 @@ export interface LoanResult {
 
 export class LoanPage extends BasePage {
   // ── Formulario ────────────────────────────────────────────────────
-  private readonly loanAmountInput   = this.currentPage.locator('input#amount');
-  private readonly downPaymentInput  = this.currentPage.locator('input#downPayment');
-  private readonly fromAccountSelect = this.currentPage.locator('select#fromAccountId');
-  private readonly applyButton       = this.currentPage.locator('input[value="Apply Now"]');
+  private readonly loanAmountInput = this.currentPage.locator("input#amount");
+  private readonly downPaymentInput =
+    this.currentPage.locator("input#downPayment");
+  private readonly fromAccountSelect = this.currentPage.locator(
+    "select#fromAccountId",
+  );
+  private readonly applyButton = this.currentPage.locator(
+    'input[value="Apply Now"]',
+  );
 
   // ── Resultado ─────────────────────────────────────────────────────
   // El panel de resultado usa el mismo #rightPanel que BillPay
-  private readonly resultTitle   = this.currentPage.locator('#rightPanel h1.title');
-  private readonly approvedPanel = this.currentPage.locator('#loanRequestApproved');
-  private readonly deniedPanel   = this.currentPage.locator('#loanRequestDenied');
-  private readonly newAccountId  = this.currentPage.locator('td#newAccountId');
-  private readonly errorPanel    = this.currentPage.locator('#rightPanel .error');
+  private readonly resultTitle = this.currentPage.locator(
+    "#rightPanel h1.title",
+  );
+  private readonly approvedPanel = this.currentPage.locator(
+    "#loanRequestApproved",
+  );
+  private readonly deniedPanel = this.currentPage.locator("#loanRequestDenied");
+  private readonly newAccountId = this.currentPage.locator("td#newAccountId");
+  private readonly errorPanel = this.currentPage.locator("#rightPanel .error");
 
   constructor(page: Page) {
     super(page);
   }
 
   async navigate(): Promise<void> {
-    await this.waitForUrl('requestloan.htm', 'navegación a solicitud de préstamo');
+    await this.waitForUrl(
+      "requestloan.htm",
+      "navegación a solicitud de préstamo",
+    );
   }
 
   /** Obtiene el primer account ID disponible en el select del formulario */
   async getFirstAccountId(): Promise<string> {
-    await this.currentPage.waitForSelector('select#fromAccountId option', {
-      state: 'attached',
+    await this.currentPage.waitForSelector("select#fromAccountId option", {
+      state: "attached",
     });
     const value = await this.currentPage
-      .locator('select#fromAccountId option')
+      .locator("select#fromAccountId option")
       .first()
-      .getAttribute('value');
+      .getAttribute("value");
     if (!value) {
       throw new Error(
-        '[Solicitud de préstamo] No se encontraron cuentas disponibles en el formulario.',
+        "[Solicitud de préstamo] No se encontraron cuentas disponibles en el formulario.",
       );
     }
     return value;
@@ -51,11 +63,11 @@ export class LoanPage extends BasePage {
 
   /** Obtiene todos los account IDs disponibles en el select */
   async getAvailableAccountIds(): Promise<string[]> {
-    await this.currentPage.waitForSelector('select#fromAccountId option', {
-      state: 'attached',
+    await this.currentPage.waitForSelector("select#fromAccountId option", {
+      state: "attached",
     });
     return this.currentPage
-      .locator('select#fromAccountId option')
+      .locator("select#fromAccountId option")
       .evaluateAll((opts: HTMLOptionElement[]) => opts.map((o) => o.value));
   }
 
@@ -66,25 +78,35 @@ export class LoanPage extends BasePage {
    * @param loan       - datos del préstamo (amount + downPayment)
    * @param fromAccountId - cuenta de donde se debitará el down payment
    */
-  async requestLoan(loan: LoanRequest, fromAccountId: string): Promise<LoanResult> {
+  async requestLoan(
+    loan: LoanRequest,
+    fromAccountId: string,
+  ): Promise<LoanResult> {
     await this.fillField(
       this.loanAmountInput,
       String(loan.amount),
-      'monto del préstamo',
+      "monto del préstamo",
     );
     await this.fillField(
       this.downPaymentInput,
       String(loan.downPayment),
-      'pago inicial',
+      "pago inicial",
     );
     await this.fromAccountSelect.selectOption(fromAccountId);
 
-    await this.clickElement(this.applyButton, 'envío de solicitud de préstamo');
+    await this.clickElement(this.applyButton, "envío de solicitud de préstamo");
 
     // El servidor procesa el préstamo vía AJAX — puede tardar varios segundos
-    await this.currentPage.waitForSelector(
-      '#loanRequestApproved, #loanRequestDenied, #rightPanel .error',
-      { timeout: 30_000 },
+    await this.currentPage.waitForFunction(
+      () => {
+        const approved = document.querySelector("#loanRequestApproved");
+        const denied = document.querySelector("#loanRequestDenied");
+        const error = document.querySelector("#rightPanel .error");
+        const isVisible = (el: Element | null) =>
+          !!el && getComputedStyle(el).display !== "none";
+        return isVisible(approved) || isVisible(denied) || isVisible(error);
+      },
+      { timeout: 60_000 },
     );
 
     return this.readResult();
@@ -93,8 +115,8 @@ export class LoanPage extends BasePage {
   /** Lee el estado del panel de resultado y retorna un objeto tipado */
   async readResult(): Promise<LoanResult> {
     const isApproved = await this.approvedPanel.isVisible();
-    const isDenied   = await this.deniedPanel.isVisible();
-    const isError    = await this.errorPanel.isVisible();
+    const isDenied = await this.deniedPanel.isVisible();
+    const isError = await this.errorPanel.isVisible();
 
     if (isApproved) {
       let accountId: string | undefined;
@@ -107,25 +129,31 @@ export class LoanPage extends BasePage {
       return {
         approved: true,
         newAccountId: accountId,
-        message: await this.getTextContent(this.resultTitle, 'título de resultado'),
+        message: await this.getTextContent(
+          this.resultTitle,
+          "título de resultado",
+        ),
       };
     }
 
     if (isDenied) {
       const message = await this.getTextContent(
-        this.deniedPanel.locator('p').first(),
-        'mensaje de rechazo',
+        this.deniedPanel.locator("p").first(),
+        "mensaje de rechazo",
       );
       return { approved: false, message };
     }
 
     if (isError) {
-      const message = await this.getTextContent(this.errorPanel, 'panel de error');
+      const message = await this.getTextContent(
+        this.errorPanel,
+        "panel de error",
+      );
       return { approved: false, message };
     }
 
     throw new Error(
-      '[Solicitud de préstamo] No se pudo determinar el resultado: ningún panel fue visible tras la solicitud.',
+      "[Solicitud de préstamo] No se pudo determinar el resultado: ningún panel fue visible tras la solicitud.",
     );
   }
 }

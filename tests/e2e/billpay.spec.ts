@@ -71,13 +71,6 @@ test.describe("Bill Pay — happy path", () => {
     authenticatedAsJohn,
     page,
   }) => {
-    test.fail(
-      true,
-      "Known environment limitation: navigating to overview.htm before payBill() " +
-        "invalidates the Parabank session context required for bill pay POST. " +
-        "Balance reads return $0. This test requires API-based balance verification " +
-        "which will be implemented in tests/api/ (Phase 2).",
-    );
 
     const billPayPage = new BillPayPage(page);
     const accountsPage = new AccountsPage(page);

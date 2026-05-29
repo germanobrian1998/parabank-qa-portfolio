@@ -1,6 +1,6 @@
-import { type Page, type Locator } from '@playwright/test';
-import { BasePage } from './BasePage';
-import { type CustomerData } from '../factories/UserFactory';
+import { type Page, type Locator } from "@playwright/test";
+import { BasePage } from "./BasePage";
+import { type CustomerData } from "../factories/UserFactory";
 
 export interface RegisterResult {
   username: string;
@@ -56,17 +56,17 @@ export class RegisterPage extends BasePage {
   }
   private get welcomeHeading(): Locator {
     // Parabank muestra "Welcome {firstName} {lastName}" tras registro exitoso
-    return this.page.locator('#rightPanel h1.title');
+    return this.page.locator("#rightPanel h1.title");
   }
   private get errorMessage(): Locator {
-    return this.page.locator('#rightPanel .error');
+    return this.page.locator("#rightPanel .error");
   }
 
   // — Actions —
 
   async navigate(): Promise<void> {
-    await this.page.goto('/parabank/register.htm');
-    await this.waitForUrl(/register\.htm/, 'Navigate to Register');
+    await this.page.goto("/parabank/register.htm");
+    await this.waitForUrl(/register\.htm/, "Navigate to Register");
   }
 
   /**
@@ -77,34 +77,55 @@ export class RegisterPage extends BasePage {
    * Si no lo retornamos acá, el test tiene que volver a buscarlo.
    */
   async register(data: CustomerData): Promise<RegisterResult> {
-    await this.fillField(this.firstNameInput, data.firstName, 'First Name');
-    await this.fillField(this.lastNameInput, data.lastName, 'Last Name');
-    await this.fillField(this.addressInput, data.address, 'Address');
-    await this.fillField(this.cityInput, data.city, 'City');
-    await this.fillField(this.stateInput, data.state, 'State');
-    await this.fillField(this.zipCodeInput, data.zipCode, 'Zip Code');
-    await this.fillField(this.phoneInput, data.phone, 'Phone');
-    await this.fillField(this.ssnInput, data.ssn, 'SSN');
-    await this.fillField(this.usernameInput, data.username, 'Username');
-    await this.fillField(this.passwordInput, data.password, 'Password');
-    await this.fillField(this.confirmPasswordInput, data.password, 'Confirm Password');
+    await this.fillField(this.firstNameInput, data.firstName, "First Name");
+    await this.fillField(this.lastNameInput, data.lastName, "Last Name");
+    await this.fillField(this.addressInput, data.address, "Address");
+    await this.fillField(this.cityInput, data.city, "City");
+    await this.fillField(this.stateInput, data.state, "State");
+    await this.fillField(this.zipCodeInput, data.zipCode, "Zip Code");
+    await this.fillField(this.phoneInput, data.phone, "Phone");
+    await this.fillField(this.ssnInput, data.ssn, "SSN");
+    await this.fillField(this.usernameInput, data.username, "Username");
+    await this.fillField(this.passwordInput, data.password, "Password");
+    await this.fillField(
+      this.confirmPasswordInput,
+      data.password,
+      "Confirm Password",
+    );
 
-    await this.clickElement(this.registerButton, 'Submit Registration');
-
-    // Esperamos confirmación o error — ambos son resultados válidos
-    await this.page.waitForSelector('#rightPanel h1.title, #rightPanel .error', {
-      timeout: 15_000,
-    });
+    await Promise.all([
+      this.page.waitForResponse(
+        (resp) =>
+          resp.url().includes("register.htm") &&
+          resp.request().method() === "POST",
+        { timeout: 15_000 },
+      ),
+      this.clickElement(this.registerButton, "Submit Registration"),
+    ]);
+    await this.page.waitForFunction(
+      () => {
+        const h1 = document.querySelector("#rightPanel h1.title");
+        return (
+          h1 &&
+          (h1.textContent?.includes("Welcome") ||
+            !!document.querySelector("#rightPanel .error"))
+        );
+      },
+      { timeout: 15_000 },
+    );
 
     const welcomeText = await this.welcomeHeading
       .textContent()
       .catch(() => null);
 
     if (!welcomeText) {
-      const error = await this.getTextContent(this.errorMessage, 'Registration error');
+      const error = await this.getTextContent(
+        this.errorMessage,
+        "Registration error",
+      );
       throw new Error(
         `[Registration] Registro rechazado para username "${data.username}". ` +
-        `Mensaje del sistema: ${error}`
+          `Mensaje del sistema: ${error}`,
       );
     }
 

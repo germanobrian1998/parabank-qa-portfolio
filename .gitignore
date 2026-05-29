@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
+# Build
+dist/
+
+# Env
+.env
+.env.local
+
+# Docker / DB
+hsqldb.jar
+db-dirty.script
+tmp/
+
+# OS
+.DS_Store
