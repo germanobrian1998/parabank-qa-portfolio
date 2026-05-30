@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/germanobrian1998/parabank-qa-portfolio#readme",
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@faker-js/faker": "^10.4.0",
     "@playwright/test": "^1.60.0",
     "typescript": "^6.0.3"
