@@ -1,7 +1,7 @@
 # Tech Discovery Report — Parabank
 
 **Fecha:** 2025-06  
-**Última actualización:** 26/05/2026  
+**Última actualización:** 30/05/2026  
 **Explorador:** QA Engineer (Portfolio Project)  
 **Sistema:** Parabank — Banking Demo Application  
 **URL:** https://parabank.parasoft.com  
@@ -140,8 +140,9 @@ UI o contra una instancia Docker local donde el endpoint sí está disponible.
 | Campo | Valida cliente | Valida servidor | Riesgo |
 |-------|---------------|-----------------|--------|
 | Monto > 0 | Validación HTML (`min`) | **No valida server-side** — acepta montos negativos (H-007 confirmado) | **Crítico** |
+| Monto $0.00 | No validado en cliente | **No valida server-side** — acepta transferencias de cero (H-016 confirmado) | **Media** |
 | Cuenta origen con saldo suficiente | No validado en cliente | **No valida server-side** — acepta overdraft (H-010 confirmado) | **Crítico** |
-| Cuenta destino distinta a origen | No validado visualmente | Pendiente — requiere instancia Docker local | Medio |
+| Cuenta destino distinta a origen | No validado visualmente | **No valida server-side** — acepta self-transfer (H-017 confirmado) | **Medio** |
 
 ### 4.3 Formulario de Bill Pay
 
@@ -322,6 +323,58 @@ Un monto negativo en una solicitud de préstamo podría generar deuda invertida 
 
 ---
 
+### H-016: El servidor acepta transferencias de $0.00
+
+**Fecha de verificación:** 30/05/2026  
+**Método:** API directa — `POST /transfer?amount=0`  
+**Severidad:** Media  
+**Estado:** Confirmado — test.fail() en transfer.edge.spec.ts
+
+**Evidencia:**
+- Request: `POST /transfer?fromAccountId=X&toAccountId=Y&amount=0`
+- Response: `Successfully transferred $0 from account #X to account #Y`
+- El servidor no rechaza la operación ni devuelve error de validación
+
+**Impacto de negocio:** una transferencia de $0 no mueve fondos pero genera
+una transacción en el historial de ambas cuentas. En un sistema real esto
+contamina el registro de movimientos del cliente y puede generar alertas
+incorrectas en sistemas de detección de fraude (volumen de transacciones
+sin movimiento económico real).
+
+**Patrón:** consistente con H-007, H-015 — ausencia de validación de
+rangos numéricos server-side en flujos financieros.
+
+**Impacto en automation:**
+- Test marcado `test.fail()` en transfer.edge.spec.ts
+- Descubierto mediante Boundary Value Analysis del límite inferior del módulo de transferencias
+
+---
+
+### H-017: El servidor acepta transferencias de una cuenta a sí misma
+
+**Fecha de verificación:** 30/05/2026  
+**Método:** API directa — `POST /transfer?fromAccountId=X&toAccountId=X`  
+**Severidad:** Media  
+**Estado:** Confirmado — test.fail() en transfer.edge.spec.ts
+
+**Evidencia:**
+- Request: `POST /transfer?fromAccountId=13122&toAccountId=13122&amount=100`
+- Response: HTTP 200 — operación procesada sin error
+- Saldo de la cuenta no varía (débito + crédito se cancelan)
+- El historial registra dos transacciones: un débito y un crédito en la misma cuenta
+
+**Impacto de negocio:** genera un par de transacciones fantasma en el
+historial de la cuenta. En auditorías financieras, transacciones de
+cuenta-a-sí-misma son una anomalía que puede indicar intentos de
+evasión de controles de reporting (structuring) — un sistema robusto
+debe rechazarlas o registrarlas con flag especial.
+
+**Impacto en automation:**
+- Test marcado `test.fail()` en transfer.edge.spec.ts
+- Descubierto mediante BVA del caso límite cuenta origen = cuenta destino
+
+---
+
 ## 7. Decisiones que este reporte informa
 
 | Hallazgo | Decisión arquitectónica que modifica |
@@ -343,3 +396,5 @@ Un monto negativo en una solicitud de préstamo podría generar deuda invertida 
 | H-013 confirmado: saldo inicial $100 en lugar de $0 | Documentado; puede ser comportamiento intencional del demo |
 | H-014 confirmado: mismatch de cuenta no validado server-side | Demuestra necesidad de tests de API directos que bypaseen validación JS |
 | H-015 confirmado: monto negativo en préstamo aceptado | Confirma patrón sistémico H-007 |
+| H-016 confirmado: $0.00 aceptado en transferencia | BVA edge cases incluyen límite inferior $0.00; transfer.edge.spec.ts documenta el caso con test.fail() |
+| H-017 confirmado: self-transfer aceptado | BVA edge cases incluyen caso cuenta origen = destino; confirma ausencia de validación de IDs server-side |
