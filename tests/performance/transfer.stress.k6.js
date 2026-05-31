@@ -20,9 +20,11 @@
 // Si el error rate supera el 1%, hay degradación sistémica, no solo
 // el bug puntual ya documentado.
 //
-// CUENTAS USADAS:
-// fromAccount: 13566 (balance: $100) — saldo conocido, suficiente para transfers pequeñas
-// toAccount: 13788 (balance: $100) — cuenta separada para evitar self-transfer
+// SELECCIÓN DE CUENTAS:
+// Setup resuelve dinámicamente dos cuentas CHECKING con balance > $100.
+// No se hardcodean IDs — el stress test acumula estado en la BD y puede
+// agotar el saldo de una cuenta entre corridas, causando 100% error rate
+// en la siguiente ejecución (bug confirmado en CI el 30/05/2026).
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -48,7 +50,10 @@ export const options = {
   },
 };
 
-// Setup: obtener cuentas válidas antes de la carga
+// Setup: resolver cuentas dinámicamente antes de la carga.
+// Selecciona las dos primeras cuentas CHECKING con balance > $100.
+// Si no hay dos cuentas elegibles, el setup falla con mensaje claro
+// en lugar de correr el test con cuentas inválidas.
 export function setup() {
   const loginRes = http.get(
     'http://localhost:9090/parabank/services/bank/login/john/demo',
@@ -59,21 +64,41 @@ export function setup() {
     throw new Error(`Setup failed: login returned ${loginRes.status}`);
   }
 
-  // Retornar objeto plano — k6 serializa setup() a JSON
-  // Las cuentas están hardcodeadas como fallback seguro
+  const customer = JSON.parse(loginRes.body);
+
+  const accountsRes = http.get(
+    `http://localhost:9090/parabank/services/bank/customers/${customer.id}/accounts`,
+    { headers: { Accept: 'application/json' } }
+  );
+
+  if (accountsRes.status !== 200) {
+    throw new Error(`Setup failed: accounts returned ${accountsRes.status}`);
+  }
+
+  const accounts = JSON.parse(accountsRes.body);
+
+  // Filtrar cuentas CHECKING con saldo suficiente para absorber
+  // ~1500 transferencias de $1 sin agotarse (balance > $100 es suficiente
+  // porque H-010 confirma que el servidor no valida saldo — nunca rechaza).
+  const eligible = accounts.filter(
+    (a) => a.type === 'CHECKING' && a.balance > 100
+  );
+
+  if (eligible.length < 2) {
+    throw new Error(
+      `Setup failed: need at least 2 CHECKING accounts with balance > $100. ` +
+      `Found: ${eligible.length}. Re-seed the Docker image before running performance tests.`
+    );
+  }
+
   return {
-    fromAccountId: 13566,
-    toAccountId: 13788,
+    fromAccountId: eligible[0].id,
+    toAccountId: eligible[1].id,
   };
 }
 
 export default function (data) {
-  // k6 pasa el return value de setup() como primer argumento
-  // Si data es undefined, usar fallback — evita que el script corra en vacío
-  const fromAccountId = (data && data.fromAccountId) || 13566;
-  const toAccountId = (data && data.toAccountId) || 13788;
-
-  const url = `http://localhost:9090/parabank/services/bank/transfer?fromAccountId=${fromAccountId}&toAccountId=${toAccountId}&amount=1`;
+  const url = `http://localhost:9090/parabank/services/bank/transfer?fromAccountId=${data.fromAccountId}&toAccountId=${data.toAccountId}&amount=1`;
 
   const res = http.post(url, null, {
     headers: { Accept: 'application/json' },
