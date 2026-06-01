@@ -7,7 +7,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["html"], ["junit", { outputFile: "test-results/results.xml" }]],
   use: {
-    baseURL: "http://localhost:9090",
+    baseURL: process.env.BASE_URL || "http://localhost:9090",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "on-first-retry",

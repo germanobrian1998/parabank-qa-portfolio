@@ -16,7 +16,7 @@ export class LoginPage extends BasePage {
   private readonly submitButton = this.page.locator('input[value="Log In"]');
 
   async navigate(): Promise<void> {
-    await this.page.goto("http://localhost:9090/parabank/index.htm");
+    await this.page.goto(`${process.env.BASE_URL || 'http://localhost:9090'}/parabank/index.htm`);
   }
 
   async login(credentials: LoginCredentials): Promise<AccountInfo> {

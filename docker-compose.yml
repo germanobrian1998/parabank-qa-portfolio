@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  parabank:
+    image: germanobrian1998/parabank:latest
+    ports:
+      - "9090:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/parabank/index.htm"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.60.0-noble
+    depends_on:
+      parabank:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    working_dir: /app
+    environment:
+      - BASE_URL=http://parabank:8080
+    command: >
+      sh -c "npm ci && npx playwright test --reporter=list,junit"

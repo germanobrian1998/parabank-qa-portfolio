@@ -78,7 +78,7 @@ export class ApiClient {
   private readonly baseUrl: string;
   private requestContext: APIRequestContext | null = null;
 
-  constructor(baseUrl = 'http://localhost:9090/parabank') {
+  constructor(baseUrl = `${process.env.BASE_URL || 'http://localhost:9090'}/parabank`) {
     this.baseUrl = baseUrl;
   }
 
