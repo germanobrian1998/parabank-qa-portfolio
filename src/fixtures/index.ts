@@ -2,6 +2,7 @@
 import { test as base, Page } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { TransferPage } from '../pages/TransferPage';
+import { ApiClient } from '../api/client/ApiClient';
 
 type Fixtures = {
   loginPage: LoginPage;
@@ -19,17 +20,34 @@ export const test = base.extend<Fixtures>({
     await use(new TransferPage(page));
   },
 
-  // Fixture compuesto: ya llega autenticado con cuenta lista
-  // Por qué: los tests de transferencia no deben testear login.
-  // Separar setup de assertion es crítico para mensajes de fallo claros.
+  // Fixture compuesto: ya llega autenticado con cuenta lista.
+  // accountId se resuelve via API para garantizar un ID válido
+  // independientemente del estado del Docker — evita depender del DOM
+  // del overview y del valor retornado por LoginPage.login().
   authenticatedPage: async ({ page }, use) => {
     const loginPage = new LoginPage(page);
     await loginPage.navigate();
-    const accountInfo = await loginPage.login({
-      username: 'john',
-      password: 'demo',
+    await loginPage.login({
+      username: process.env.PARABANK_USER || 'john',
+      password: process.env.PARABANK_PASS || 'demo',
     });
-    await use({ page, accountId: accountInfo.defaultAccountId });
+
+    // Resolver accountId via API — más robusto que leer el DOM
+    const client = new ApiClient();
+    await client.init();
+    const customer = await client.login(
+      process.env.PARABANK_USER || 'john',
+      process.env.PARABANK_PASS || 'demo'
+    );
+    const accounts = await client.getAccountsForCustomer(customer.id);
+    const firstAccount = accounts.find(a => a.type === 'CHECKING');
+    await client.dispose();
+
+    if (!firstAccount) {
+      throw new Error('No CHECKING account found for authenticated user — re-seed Docker image');
+    }
+
+    await use({ page, accountId: String(firstAccount.id) });
   },
 
   // Fixture simple: login sin accountId
@@ -37,7 +55,10 @@ export const test = base.extend<Fixtures>({
   authenticatedAsJohn: async ({ page }, use) => {
     const loginPage = new LoginPage(page);
     await loginPage.navigate();
-    await loginPage.login({ username: 'john', password: 'demo' });
+    await loginPage.login({
+      username: process.env.PARABANK_USER || 'john',
+      password: process.env.PARABANK_PASS || 'demo',
+    });
     await use({ page });
   },
 });
