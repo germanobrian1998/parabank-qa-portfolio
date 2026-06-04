@@ -23,6 +23,10 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Trend, Rate } from 'k6/metrics';
 
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:9090';
+const USER     = __ENV.PARABANK_USER || 'john';
+const PASS     = __ENV.PARABANK_PASS || 'demo';
+
 const readDuration = new Trend('accounts_read_duration', true);
 const readErrorRate = new Rate('accounts_read_error_rate');
 
@@ -38,7 +42,7 @@ export const options = {
 
 export function setup() {
   const loginRes = http.get(
-    'http://localhost:9090/parabank/services/bank/login/john/demo',
+    `${BASE_URL}/parabank/services/bank/login/${USER}/${PASS}`,
     { headers: { Accept: 'application/json' } }
   );
 
@@ -48,7 +52,7 @@ export function setup() {
 
 export default function (data) {
   const res = http.get(
-    `http://localhost:9090/parabank/services/bank/customers/${data.customerId}/accounts`,
+    `${BASE_URL}/parabank/services/bank/customers/${data.customerId}/accounts`,
     {
       headers: { Accept: 'application/json' },
       tags: { endpoint: 'accounts_read' },

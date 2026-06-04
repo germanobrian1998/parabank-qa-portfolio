@@ -17,6 +17,10 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Trend, Rate } from 'k6/metrics';
 
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:9090';
+const USER     = __ENV.PARABANK_USER || 'john';
+const PASS     = __ENV.PARABANK_PASS || 'demo';
+
 const loginDuration = new Trend('login_duration', true);
 const loginErrorRate = new Rate('login_error_rate');
 
@@ -35,7 +39,7 @@ export const options = {
 
 export default function () {
   const res = http.get(
-    'http://localhost:9090/parabank/services/bank/login/john/demo',
+    `${BASE_URL}/parabank/services/bank/login/${USER}/${PASS}`,
     {
       headers: { Accept: 'application/json' },
       tags: { endpoint: 'login' },
@@ -49,7 +53,7 @@ export default function () {
     'login returns 200': (r) => r.status === 200,
     'response contains customerId': (r) => {
       try {
-        return JSON.parse(r.body).id === 12212;
+        return typeof JSON.parse(r.body).id === 'number';
       } catch {
         return false;
       }

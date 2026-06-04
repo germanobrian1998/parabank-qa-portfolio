@@ -30,6 +30,10 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate, Trend } from 'k6/metrics';
 
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:9090';
+const USER     = __ENV.PARABANK_USER || 'john';
+const PASS     = __ENV.PARABANK_PASS || 'demo';
+
 const transferErrorRate = new Rate('transfer_error_rate');
 const transferDuration = new Trend('transfer_duration', true);
 
@@ -56,7 +60,7 @@ export const options = {
 // en lugar de correr el test con cuentas inválidas.
 export function setup() {
   const loginRes = http.get(
-    'http://localhost:9090/parabank/services/bank/login/john/demo',
+    `${BASE_URL}/parabank/services/bank/login/${USER}/${PASS}`,
     { headers: { Accept: 'application/json' } }
   );
 
@@ -67,7 +71,7 @@ export function setup() {
   const customer = JSON.parse(loginRes.body);
 
   const accountsRes = http.get(
-    `http://localhost:9090/parabank/services/bank/customers/${customer.id}/accounts`,
+    `${BASE_URL}/parabank/services/bank/customers/${customer.id}/accounts`,
     { headers: { Accept: 'application/json' } }
   );
 
@@ -98,7 +102,7 @@ export function setup() {
 }
 
 export default function (data) {
-  const url = `http://localhost:9090/parabank/services/bank/transfer?fromAccountId=${data.fromAccountId}&toAccountId=${data.toAccountId}&amount=1`;
+  const url = `${BASE_URL}/parabank/services/bank/transfer?fromAccountId=${data.fromAccountId}&toAccountId=${data.toAccountId}&amount=1`;
 
   const res = http.post(url, null, {
     headers: { Accept: 'application/json' },
