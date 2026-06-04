@@ -37,7 +37,7 @@ Examples:
 ```
 fix(fixtures): remove hardcoded account IDs from transfer specs
 feat(api): add idempotency test for transfer endpoint
-docs(adr): add ADR-007 for credential management strategy
+docs(adr): add ADR-004 for credential management strategy
 refactor(k6): move credentials to environment variables
 chore(config): add explanatory comments to playwright configuration
 ```
