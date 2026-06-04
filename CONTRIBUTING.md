@@ -2,15 +2,15 @@
 
 ## Branches
 
-Crear una rama por cambio desde `main`:
+Create one branch per change from `main`:
 
 ```
-git checkout -b <tipo>/<descripcion-corta>
+git checkout -b <type>/<short-description>
 ```
 
-Tipos de rama: `fix`, `feat`, `docs`, `refactor`, `chore`, `ci`
+Branch types: `fix`, `feat`, `docs`, `refactor`, `chore`, `ci`
 
-Ejemplos:
+Examples:
 ```
 fix/remove-hardcoded-account-ids
 docs/add-env-example
@@ -20,38 +20,38 @@ chore/update-playwright-config
 ## Commits — Conventional Commits
 
 ```
-<tipo>(<scope>): <descripción en minúsculas>
+<type>(<scope>): <lowercase description>
 ```
 
-| Tipo | Cuándo usarlo |
-|------|---------------|
-| `feat` | nueva funcionalidad o test case |
-| `fix` | corrección de bug en código o test |
-| `test` | agrega o modifica tests existentes |
-| `docs` | documentación, ADRs, README |
-| `refactor` | cambio que no agrega ni corrige nada |
-| `chore` | configuración, dependencias, scripts |
-| `ci` | cambios en GitHub Actions o pipelines |
+| Type | When to use |
+|------|-------------|
+| `feat` | new feature or test case |
+| `fix` | bug fix in code or test |
+| `test` | adds or modifies existing tests |
+| `docs` | documentation, ADRs, README |
+| `refactor` | change that neither adds nor fixes anything |
+| `chore` | configuration, dependencies, scripts |
+| `ci` | changes to GitHub Actions or pipelines |
 
-Ejemplos:
+Examples:
 ```
 fix(fixtures): remove hardcoded account IDs from transfer specs
 feat(api): add idempotency test for transfer endpoint
 docs(adr): add ADR-007 for credential management strategy
 refactor(k6): move credentials to environment variables
-chore(config): update playwright timeout thresholds
+chore(config): add explanatory comments to playwright configuration
 ```
 
 ## Pull Requests
 
-1. Crear rama desde `main`
-2. Hacer los cambios con commits descriptivos
-3. Abrir PR con descripción que incluya:
-   - **Problema:** qué estaba mal o qué faltaba
-   - **Cambio:** qué se modificó y por qué
-4. Hacer merge con squash
+1. Create a branch from `main`
+2. Make changes with descriptive commits
+3. Open a PR with a description that includes:
+   - **Problem:** what was wrong or missing
+   - **Change:** what was modified and why
+4. Merge with squash
 
-## Setup local
+## Local Setup
 
 ```bash
 npm install
@@ -60,4 +60,4 @@ docker compose up -d
 npm test
 ```
 
-Variables de entorno requeridas — ver `.env.example`.
+Required environment variables — see `.env.example`.
