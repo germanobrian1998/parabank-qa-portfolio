@@ -2,6 +2,7 @@
 import { test, expect } from '../../src/fixtures';
 import { TransferFactory } from '../../src/factories/TransferFactory';
 import { expectTransferConfirmed } from '../../src/helpers/assertions';
+import { ApiClient } from '../../src/api/client/ApiClient';
 
 test.describe('Transfers — funds movement between own accounts', () => {
 
@@ -13,10 +14,29 @@ test.describe('Transfers — funds movement between own accounts', () => {
       // A silent failure here means customer sees incorrect balance
       // without any error, which is a critical trust issue.
 
-      const transfer = TransferFactory.valid('13122', '13344');
+      const { page, accountId: fromAccountId } = authenticatedPage;
+
+      const client = new ApiClient();
+      await client.init();
+
+      const customer = await client.login(
+        process.env.PARABANK_USER || 'john',
+        process.env.PARABANK_PASS || 'demo'
+      );
+      const accounts = await client.getAccountsForCustomer(customer.id);
+      const toAccount = accounts.find((a) => String(a.id) !== fromAccountId);
+
+      if (!toAccount) {
+        throw new Error('No second account found for transfer destination — re-seed Docker image');
+      }
+
       await transferPage.navigate();
-      await transferPage.transfer(transfer);
+      await transferPage.transfer(
+        TransferFactory.valid(fromAccountId, String(toAccount.id))
+      );
       await expectTransferConfirmed(transferPage.currentPage);
+
+      await client.dispose();
     }
   );
 
@@ -30,9 +50,21 @@ test.describe('Transfers — funds movement between own accounts', () => {
 
       test.fail(true, 'Parabank allows overdraft: transfer of $999999 from account with insufficient funds was accepted silently');
 
+      const { accountId: fromAccountId } = authenticatedPage;
+
+      const client = new ApiClient();
+      await client.init();
+
+      const customer = await client.login(
+        process.env.PARABANK_USER || 'john',
+        process.env.PARABANK_PASS || 'demo'
+      );
+      const accounts = await client.getAccountsForCustomer(customer.id);
+      const toAccount = accounts.find((a) => String(a.id) !== fromAccountId);
+
       await transferPage.navigate();
       await transferPage.transfer(
-        TransferFactory.withAmount('13122', '13344', 999_999)
+        TransferFactory.withAmount(fromAccountId, String(toAccount!.id), 999_999)
       );
 
       await expect(
@@ -40,6 +72,8 @@ test.describe('Transfers — funds movement between own accounts', () => {
         'No error shown for insufficient funds transfer — ' +
         'system is allowing overdraft silently'
       ).toBeVisible();
+
+      await client.dispose();
     }
   );
 
@@ -53,9 +87,21 @@ test.describe('Transfers — funds movement between own accounts', () => {
 
       test.fail(true, 'H-007: Server accepts negative transfer amounts — known critical bug');
 
+      const { accountId: fromAccountId } = authenticatedPage;
+
+      const client = new ApiClient();
+      await client.init();
+
+      const customer = await client.login(
+        process.env.PARABANK_USER || 'john',
+        process.env.PARABANK_PASS || 'demo'
+      );
+      const accounts = await client.getAccountsForCustomer(customer.id);
+      const toAccount = accounts.find((a) => String(a.id) !== fromAccountId);
+
       await transferPage.navigate();
       await transferPage.transfer(
-        TransferFactory.withNegativeAmount('13122', '13344')
+        TransferFactory.withNegativeAmount(fromAccountId, String(toAccount!.id))
       );
 
       await expect(
@@ -63,6 +109,8 @@ test.describe('Transfers — funds movement between own accounts', () => {
         'Negative transfer amount was accepted — ' +
         'server-side validation missing for negative monetary values'
       ).toBeVisible();
+
+      await client.dispose();
     }
   );
 });
