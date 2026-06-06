@@ -375,6 +375,77 @@ debe rechazarlas o registrarlas con flag especial.
 
 ---
 
+### H-018: Acceso no autenticado a datos de cuentas y clientes via REST API
+
+**Fecha de verificación:** 06/06/2026  
+**Método:** API directa sin JSESSIONID — `GET /accounts/{id}` y `GET /customers/{id}/accounts`  
+**Severidad:** Crítica  
+**Estado:** Confirmado — test.fail() en tests/api/authorization.api.spec.ts (Vectors 1 y 3)
+
+**Descripción:**
+
+Dos endpoints de la API REST exponen datos financieros de clientes sin requerir
+autenticación. Cualquier cliente HTTP puede leer balances, tipos de cuenta e IDs
+sin presentar una sesión válida (JSESSIONID).
+
+**Endpoints afectados:**
+
+| Endpoint | Método | Datos expuestos |
+|----------|--------|----------------|
+| `/services/bank/accounts/{accountId}` | GET | balance, tipo, customerId |
+| `/services/bank/customers/{customerId}/accounts` | GET | lista completa de cuentas con balances |
+
+**Evidencia — Vector 1 (acceso por accountId sin sesión):**
+```
+GET /parabank/services/bank/accounts/12345
+Sin JSESSIONID → HTTP 200
+
+{"id": 12345, "customerId": 12212, "type": "CHECKING", "balance": -6001001053.06}
+```
+
+**Evidencia — Vector 3 (enumeración por customerId sin sesión):**
+```
+GET /parabank/services/bank/customers/12212/accounts
+Sin JSESSIONID → HTTP 200
+
+[
+  {"id": 12345, "customerId": 12212, "type": "CHECKING", "balance": -6001001053.06},
+  {"id": 12456, "customerId": 12212, "type": "CHECKING", "balance": 6000994563.51},
+  ... (10+ cuentas con balances reales)
+]
+```
+
+**Vector de ataque:**
+
+El `customerId` es un entero secuencial (12212 en el seed). Un atacante puede
+iterar sobre un rango de IDs con un script simple y obtener la estructura
+financiera completa de todos los clientes del banco sin credenciales.
+
+**Impacto de negocio:** en un sistema de producción, este hallazgo permitiría
+lectura de balances y tipos de cuenta de cualquier cliente, correlación de
+`customerId` → `accountId` para ataques posteriores, y violación de
+confidencialidad financiera regulada.
+
+**Regulación aplicable:** PCI-DSS Requerimiento 7 — el acceso a datos del
+titular de la cuenta debe estar restringido estrictamente por identidad del
+usuario autenticado.
+
+**Comportamiento esperado:** ambos endpoints deben responder `HTTP 401
+Unauthorized` sin JSESSIONID válido, y `HTTP 403 Forbidden` cuando el usuario
+autenticado intenta acceder a recursos que no le pertenecen.
+
+**Patrón:** este hallazgo ilustra la diferencia entre autenticación (¿quién sos?)
+y autorización (¿a qué tenés acceso?). Parabank valida autenticación en el login
+pero no aplica autorización a nivel de recurso en los endpoints de consulta.
+El patrón se conoce como **IDOR** (Insecure Direct Object Reference) —
+OWASP Top 10 A01:2021 Broken Access Control.
+
+**Impacto en automation:**
+- Tests marcados `test.fail()` en authorization.api.spec.ts (Vectors 1 y 3)
+- Vector 2 (cross-user IDOR) marcado como skipped — requiere segundo usuario registrado
+
+---
+
 ## 7. Decisiones que este reporte informa
 
 | Hallazgo | Decisión arquitectónica que modifica |
@@ -398,3 +469,4 @@ debe rechazarlas o registrarlas con flag especial.
 | H-015 confirmado: monto negativo en préstamo aceptado | Confirma patrón sistémico H-007 |
 | H-016 confirmado: $0.00 aceptado en transferencia | BVA edge cases incluyen límite inferior $0.00; transfer.edge.spec.ts documenta el caso con test.fail() |
 | H-017 confirmado: self-transfer aceptado | BVA edge cases incluyen caso cuenta origen = destino; confirma ausencia de validación de IDs server-side |
+| H-018 confirmado: IDOR en endpoints de cuentas sin autenticación | authorization.api.spec.ts documenta ambos vectores con test.fail(); PCI-DSS req. 7 violado |
