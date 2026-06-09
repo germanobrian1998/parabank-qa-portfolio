@@ -1,0 +1,435 @@
+{
+  "info": {
+    "_postman_id": "fd8176c7-ede3-428a-9124-d37d6ab27b9b",
+    "name": "Parabank API — QA Portfolio",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "27662571"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login — john/demo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Login returns HTTP 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response contains customerId', function () {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property('id');",
+                  "});",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.environment.set('customerId', body.id);",
+                  "pm.environment.set('firstName', body.firstName);",
+                  "console.log('customerId capturado:', body.id);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/services/bank/login/john/demo",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "services",
+                "bank",
+                "login",
+                "john",
+                "demo"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "Get Customer Accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns HTTP 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array with at least 2 accounts', function () {",
+                  "    const accounts = pm.response.json();",
+                  "    pm.expect(accounts).to.be.an('array');",
+                  "    pm.expect(accounts.length).to.be.at.least(2);",
+                  "});",
+                  "",
+                  "const accounts = pm.response.json();",
+                  "const sorted = accounts.slice().sort((a, b) => b.balance - a.balance);",
+                  "",
+                  "pm.environment.set('fromAccountId', sorted[0].id);",
+                  "pm.environment.set('fromAccountBalance', sorted[0].balance);",
+                  "pm.environment.set('toAccountId', sorted[1].id);",
+                  "pm.environment.set('toAccountBalance', sorted[1].balance);",
+                  "",
+                  "console.log('fromAccountId:', sorted[0].id, '| balance:', sorted[0].balance);",
+                  "console.log('toAccountId:', sorted[1].id, '| balance:', sorted[1].balance);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/services/bank/customers/{{customerId}}/accounts",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "services",
+                "bank",
+                "customers",
+                "{{customerId}}",
+                "accounts"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Transfers",
+      "item": [
+        {
+          "name": "Transfer — valid amount",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Transfer returns HTTP 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response confirms transfer', function () {",
+                  "    pm.expect(pm.response.text()).to.include('Successfully transferred');",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/services/bank/transfer?fromAccountId={{fromAccountId}}&toAccountId={{toAccountId}}&amount={{transferAmount}}",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "services",
+                "bank",
+                "transfer"
+              ],
+              "query": [
+                {
+                  "key": "fromAccountId",
+                  "value": "{{fromAccountId}}"
+                },
+                {
+                  "key": "toAccountId",
+                  "value": "{{toAccountId}}"
+                },
+                {
+                  "key": "amount",
+                  "value": "{{transferAmount}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Transfer — negative amount [BUG H-007]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('[H-007] Negative amount should return 4xx — CURRENTLY RETURNS 200', function () {",
+                  "    if (pm.response.code === 200) {",
+                  "        console.warn('H-007 CONFIRMED: negative transfer amount accepted by server.');",
+                  "    }",
+                  "    pm.expect(pm.response.code, 'H-007: server should reject negative amounts with 4xx').to.be.within(400, 499);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/services/bank/transfer?fromAccountId={{fromAccountId}}&toAccountId={{toAccountId}}&amount=-100",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "services",
+                "bank",
+                "transfer"
+              ],
+              "query": [
+                {
+                  "key": "fromAccountId",
+                  "value": "{{fromAccountId}}"
+                },
+                {
+                  "key": "toAccountId",
+                  "value": "{{toAccountId}}"
+                },
+                {
+                  "key": "amount",
+                  "value": "-100"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Transfer — exceeds balance [BUG H-010]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('[H-010] Overdraft should return 4xx — CURRENTLY RETURNS 200', function () {",
+                  "    if (pm.response.code === 200) {",
+                  "        console.warn('H-010 CONFIRMED: transfer exceeding balance accepted.');",
+                  "    }",
+                  "    pm.expect(pm.response.code, 'H-010: server should reject overdraft with 4xx').to.be.within(400, 499);",
+                  "});"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/services/bank/transfer?fromAccountId={{fromAccountId}}&toAccountId={{toAccountId}}&amount=999999999",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "services",
+                "bank",
+                "transfer"
+              ],
+              "query": [
+                {
+                  "key": "fromAccountId",
+                  "value": "{{fromAccountId}}"
+                },
+                {
+                  "key": "toAccountId",
+                  "value": "{{toAccountId}}"
+                },
+                {
+                  "key": "amount",
+                  "value": "999999999"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Get Transactions for Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns HTTP 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Each transaction has required fields', function () {",
+                  "    const transactions = pm.response.json();",
+                  "    if (transactions.length === 0) return;",
+                  "    transactions.forEach(function(tx) {",
+                  "        pm.expect(tx).to.have.property('id');",
+                  "        pm.expect(tx).to.have.property('amount');",
+                  "        pm.expect(tx).to.have.property('type');",
+                  "        pm.expect(tx).to.have.property('date');",
+                  "    });",
+                  "});",
+                  "",
+                  "const transactions = pm.response.json();",
+                  "pm.environment.set('transactionCount', transactions.length);",
+                  "if (transactions.length > 0) {",
+                  "    pm.environment.set('lastTransactionId', transactions[0].id);",
+                  "}",
+                  "console.log('Transacciones encontradas:', transactions.length);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/services/bank/accounts/{{fromAccountId}}/transactions",
+              "host": [
+                "{{BASE_URL}}"
+              ],
+              "path": [
+                "services",
+                "bank",
+                "accounts",
+                "{{fromAccountId}}",
+                "transactions"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": ""
+    },
+    {
+      "key": "transferAmount",
+      "value": ""
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "fromAccountId",
+      "value": ""
+    },
+    {
+      "key": "toAccountId",
+      "value": ""
+    },
+    {
+      "key": "fromAccountBalance",
+      "value": ""
+    },
+    {
+      "key": "toAccountBalance",
+      "value": ""
+    },
+    {
+      "key": "JSESSIONID",
+      "value": ""
+    }
+  ]
+}
