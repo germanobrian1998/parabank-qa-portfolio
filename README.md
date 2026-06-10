@@ -141,11 +141,27 @@ Performance baseline (k6):
 
 | Scenario | Metric | Result | Threshold |
 |----------|--------|--------|-----------|
-| Login baseline | p95 | 18ms | 2000ms ✅ |
-| Transfer stress (50 VUs) | p95 | 17ms | 500ms ✅ |
-| Accounts soak (30 min) | p99 | 27ms | 3000ms ✅ |
+| Login baseline | p95 | 24ms | 2000ms ✅ |
+| Transfer stress (20 VUs) | p95 | 20ms | 500ms ✅ |
+| Accounts soak (2 min) | p99 | 27ms | 3000ms ✅ |
 
 Accessibility: 26 WCAG 2.1 AA violations across 5 pages — documented as warnings, not suite failures.
+
+---
+
+## Performance dashboard
+
+Test results streamed to Grafana Cloud during each run.
+
+[View dashboard →](https://prudentfinch2125.grafana.net/a/k6-app/projects/7789507)
+
+Baseline measured on 2026-06-10, Docker local execution:
+
+| Scenario | p95 | Threshold | Run |
+|----------|-----|-----------|-----|
+| Login baseline | 24ms | 2000ms ✅ | [10 Jun 19:15](https://prudentfinch2125.grafana.net/a/k6-app/runs/7739942) |
+| Transfer stress | 20ms | 500ms ✅ | [10 Jun 19:20](https://prudentfinch2125.grafana.net/a/k6-app/runs/7739986) |
+| Accounts soak | 17ms | 3000ms ✅ | [10 Jun 19:23](https://prudentfinch2125.grafana.net/a/k6-app/runs/7740004) |
 
 ---
 
@@ -171,10 +187,10 @@ npx playwright test --grep "@smoke"
 # Single spec
 npx playwright test tests/e2e/auth.spec.ts
 
-# Performance (requires k6)
-k6 run tests/performance/login.baseline.k6.js
-k6 run tests/performance/transfer.stress.k6.js
-k6 run tests/performance/accounts.soak.k6.js
+# Performance (requires k6 + Grafana Cloud auth)
+k6 cloud run --local-execution tests/performance/login.baseline.k6.js
+k6 cloud run --local-execution tests/performance/transfer.stress.k6.js
+k6 cloud run --local-execution tests/performance/accounts.soak.k6.js
 
 # Generate metrics report
 npx ts-node scripts/generate-report.ts
@@ -190,6 +206,7 @@ npx ts-node scripts/generate-report.ts
 - [Accessibility Report](docs/accessibility-report.md) — 26 WCAG 2.1 AA violations with business impact
 - [Not Automated](docs/not-automated.md) — 5 cases excluded with cost/risk justification
 - [Lessons Learned](docs/lessons-learned.md) — honest retrospective on the process
+- [PCI-DSS Coverage](docs/pci-dss-coverage.md) — SAQ A control mapping to test suite and documented bugs
 - [CHANGELOG](CHANGELOG.md) — technical history v0.1.0 → v0.5.0
 
 ---
