@@ -38,6 +38,12 @@ export const options = {
     accounts_read_error_rate: ['rate<0.01'],
     http_req_duration: ['p(95)<2000'],
   },
+  ext: {
+    loadimpact: {
+      projectID: 7789507,
+      name: 'Parabank — Accounts Soak Test',
+    },
+  },
 };
 
 export function setup() {

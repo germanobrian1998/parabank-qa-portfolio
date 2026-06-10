@@ -52,6 +52,12 @@ export const options = {
     transfer_error_rate: ['rate<0.01'],
     transfer_duration: ['p(95)<3000'],
   },
+  ext: {
+    loadimpact: {
+      projectID: 7789507,
+      name: 'Parabank — Transfer Stress Test',
+    },
+  },
 };
 
 // Setup: resolver cuentas dinámicamente antes de la carga.
