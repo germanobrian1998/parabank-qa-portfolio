@@ -94,6 +94,70 @@ test.describe('Transfer API — contract tests', () => {
     },
   );
 
+  // ── Invariante financiera ───────────────────────────────────────────────────
+
+  test(
+    'total balance across all accounts should be conserved after transfer',
+    async () => {
+      // INVARIANTE FINANCIERA: en cualquier sistema de ledger correcto,
+      // el dinero no se crea ni se destruye en una transferencia interna.
+      // La suma de todos los saldos antes debe ser idéntica a la suma después.
+      //
+      // Por qué importa en fintech: si esta invariante se viola, hay dinero
+      // fantasma en el sistema — ya sea creado (fraude) o destruido (pérdida).
+      // Este test detecta ambos casos independientemente de la UI.
+      //
+      // Relación con bugs existentes:
+      // H-010 (overdraft) viola esta invariante cuando el saldo fuente
+      // cae a negativo sin límite — el sistema "crea" dinero en el destino
+      // que no existía como activo real.
+      //
+      // NOTA: este test usa accounts[0]/accounts[1] vía setupAuthenticatedClient(),
+      // sin filtrar por balance. Si esas cuentas están contaminadas por stress
+      // tests previos (ver CHANGELOG v0.3.0/v0.4.0 y PENDING.md P-002) y el
+      // transfer falla por fondos insuficientes, el test falla con un ApiError
+      // explícito — no en silencio — lo cual es el comportamiento correcto.
+      // Si esto se vuelve un problema recurrente, conviene que
+      // setupAuthenticatedClient() resuelva dinámicamente una cuenta con
+      // balance en un rango razonable, como ya se hizo en setupLoanClient().
+
+      const { client, fromAccountId, toAccountId } = await setupAuthenticatedClient();
+      const transferAmount = 100;
+
+      try {
+        // Capturar estado completo antes. Reutilizamos login() para obtener
+        // el customerId; setupAuthenticatedClient() ya autenticó la sesión
+        // (las cookies del client ya están activas), así que esta segunda
+        // llamada solo resuelve el id, no crea una sesión nueva.
+        const customer = await client.login(
+          process.env.PARABANK_USER || 'john',
+          process.env.PARABANK_PASS || 'demo',
+        );
+        const accountsBefore = await client.getAccountsForCustomer(customer.id);
+        const sumBefore = accountsBefore.reduce((sum, a) => sum + a.balance, 0);
+
+        // Ejecutar transferencia
+        await client.transfer(fromAccountId, toAccountId, transferAmount);
+
+        // Verificar invariante
+        const accountsAfter = await client.getAccountsForCustomer(customer.id);
+        const sumAfter = accountsAfter.reduce((sum, a) => sum + a.balance, 0);
+
+        expect(
+          sumAfter,
+          `Financial invariant violated: total balance changed after internal transfer.\n` +
+          `Before: $${sumBefore.toFixed(2)}\n` +
+          `After:  $${sumAfter.toFixed(2)}\n` +
+          `Delta:  $${(sumAfter - sumBefore).toFixed(2)}\n` +
+          `A non-zero delta means money was created or destroyed — critical ledger integrity issue.`,
+        ).toBeCloseTo(sumBefore, 2);
+
+      } finally {
+        await client.dispose();
+      }
+    },
+  );
+
   // ── Bugs documentados ───────────────────────────────────────────────────────
 
   test(

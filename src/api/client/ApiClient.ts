@@ -27,39 +27,18 @@
 //    de JSON (ej: /transfer → "Successfully transferred..."). El post() intenta
 //    parsear JSON y si falla retorna el texto como T para no romper el caller.
 
-import { APIRequestContext, request } from '@playwright/test';
+import { APIRequestContext, request } from "@playwright/test";
 
 // ─── Tipos públicos ───────────────────────────────────────────────────────────
+// Los tipos se infieren desde los schemas Zod en lugar de definirse manualmente.
+// Una sola fuente de verdad: el schema define tanto la validación como el tipo.
 
-export interface Customer {
-  id: number;
-  firstName: string;
-  lastName: string;
-}
-
-export interface Account {
-  id: number;
-  customerId: number;
-  type: 'CHECKING' | 'SAVINGS' | 'LOAN';
-  balance: number;
-}
-
-export interface Transaction {
-  id: number;
-  accountId: number;
-  type: string;
-  date: number;
-  amount: number;
-  description: string;
-}
-
-export interface LoanResponse {
-  loanProviderName: string;
-  responseDate: string;
-  approved: boolean;
-  message?: string;
-  accountId?: number;
-}
+import type {
+  Customer,
+  Account,
+  Transaction,
+  LoanResponse,
+} from "../../contracts/parabank.schemas";
 
 export class ApiError extends Error {
   constructor(
@@ -68,7 +47,7 @@ export class ApiError extends Error {
     public readonly endpoint: string,
   ) {
     super(`[ApiClient] ${endpoint} → HTTP ${status}: ${body}`);
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
@@ -78,29 +57,23 @@ export class ApiClient {
   private readonly baseUrl: string;
   private requestContext: APIRequestContext | null = null;
 
-  constructor(baseUrl = `${process.env.BASE_URL || 'http://localhost:9090'}/parabank`) {
+  constructor(
+    baseUrl = `${process.env.BASE_URL || "http://localhost:9090"}/parabank`,
+  ) {
     this.baseUrl = baseUrl;
   }
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  /**
-   * Crea el APIRequestContext de Playwright sin baseURL.
-   * Las URLs se construyen absolutas en cada request para evitar
-   * problemas de resolución de paths con segmentos múltiples.
-   */
   async init(): Promise<void> {
     this.requestContext = await request.newContext({
       extraHTTPHeaders: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
       },
     });
   }
 
-  /**
-   * Libera el contexto. Llamar en afterAll/afterEach para evitar leaks.
-   */
   async dispose(): Promise<void> {
     await this.requestContext?.dispose();
     this.requestContext = null;
@@ -108,11 +81,6 @@ export class ApiClient {
 
   // ── Auth ───────────────────────────────────────────────────────────────────
 
-  /**
-   * Autentica al usuario y retorna el Customer con su id.
-   * El customerId es necesario para llamar a /customers/{id}/accounts.
-   * Verificado con curl: john/demo → { id: 12212, firstName: "John", ... }
-   */
   async login(username: string, password: string): Promise<Customer> {
     return this.get<Customer>(`/services/bank/login/${username}/${password}`);
   }
@@ -120,7 +88,9 @@ export class ApiClient {
   // ── Accounts ───────────────────────────────────────────────────────────────
 
   async getAccountsForCustomer(customerId: number): Promise<Account[]> {
-    return this.get<Account[]>(`/services/bank/customers/${customerId}/accounts`);
+    return this.get<Account[]>(
+      `/services/bank/customers/${customerId}/accounts`,
+    );
   }
 
   async getAccount(accountId: number): Promise<Account> {
@@ -129,12 +99,6 @@ export class ApiClient {
 
   // ── Transfers ──────────────────────────────────────────────────────────────
 
-  /**
-   * Ejecuta una transferencia entre cuentas.
-   * Endpoint: POST /services/bank/transfer
-   * Params: fromId, toId, amount (query params según la API de Parabank)
-   * Nota: el servidor devuelve texto plano ("Successfully transferred..."), no JSON.
-   */
   async transfer(fromId: number, toId: number, amount: number): Promise<void> {
     const params = new URLSearchParams({
       fromAccountId: String(fromId),
@@ -146,15 +110,6 @@ export class ApiClient {
 
   // ── Loans ──────────────────────────────────────────────────────────────────
 
-  /**
-   * Solicita un préstamo.
-   *
-   * ADVERTENCIA — EFECTO LATERAL:
-   * Este endpoint NO es idempotente. Cada llamada crea un nuevo préstamo
-   * si es aprobada. Los tests que usan este método deben aislar el estado
-   * (usuario distinto o verificar que la cuenta generada no interfiera
-   * con otros tests).
-   */
   async requestLoan(
     customerId: number,
     fromAccountId: number,
@@ -163,51 +118,114 @@ export class ApiClient {
   ): Promise<LoanResponse> {
     const params = new URLSearchParams({
       customerId: String(customerId),
-      fromAccountId: String(fromAccountId),
-      loanAmount: String(amount),
+      amount: String(amount),
       downPayment: String(downPayment),
+      fromAccountId: String(fromAccountId),
     });
-    return this.post<LoanResponse>(`/services/bank/requestloan?${params.toString()}`);
+    return this.post<LoanResponse>(
+      `/services/bank/requestLoan?${params.toString()}`,
+    );
   }
 
   // ── Session ────────────────────────────────────────────────────────────────
 
-  /**
-   * Simula logout navegando al endpoint de cierre de sesión.
-   * Parabank no tiene endpoint REST de logout — el logout es una GET a
-   * /logout.htm que invalida el JSESSIONID en el servidor.
-   * Usado en H-009 para verificar que la sesión queda efectivamente invalidada.
-   */
   async logout(): Promise<void> {
     const response = await this.ctx().get(`${this.baseUrl}/logout.htm`, {
-      headers: { Accept: 'text/html' },
+      headers: { Accept: "text/html" },
     });
-    // logout.htm redirige a index — cualquier 2xx/3xx se considera OK
     if (response.status() >= 500) {
-      throw new ApiError(response.status(), await response.text(), 'GET /logout.htm');
+      throw new ApiError(
+        response.status(),
+        await response.text(),
+        "GET /logout.htm",
+      );
     }
   }
 
   // ── Registration ───────────────────────────────────────────────────────────
 
-  /**
-   * Intenta registrar un usuario con un username ya existente.
-   * Usado exclusivamente para documentar H-011 — el servidor no debería
-   * aceptar este request, pero actualmente lo hace.
-   */
+  async register(params: {
+    firstName: string;
+    lastName: string;
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    phoneNumber: string;
+    ssn: string;
+    username: string;
+    password: string;
+  }): Promise<void> {
+
+    // Forzar sesión completamente nueva antes del GET.
+    // El servidor Spring MVC guarda el objeto Customer en @SessionAttributes
+    // durante el GET. Si se reutiliza una sesión de una corrida anterior,
+    // el POST falla con "username already exists" porque el servidor compara
+    // contra el Customer que quedó en sesión, no contra la BD.
+    await this.dispose();
+    await this.init();
+
+    const getResponse = await this.ctx().get(`${this.baseUrl}/register.htm`);
+    if (!getResponse.ok()) {
+      throw new ApiError(
+        getResponse.status(),
+        await getResponse.text(),
+        "GET /register.htm (paso previo de sesión)",
+      );
+    }
+
+    const formData = new URLSearchParams({
+      "customer.firstName": params.firstName,
+      "customer.lastName": params.lastName,
+      "customer.address.street": params.street,
+      "customer.address.city": params.city,
+      "customer.address.state": params.state,
+      "customer.address.zipCode": params.zipCode,
+      "customer.phoneNumber": params.phoneNumber,
+      "customer.ssn": params.ssn,
+      "customer.username": params.username,
+      "customer.password": params.password,
+      repeatedPassword: params.password,
+    });
+
+    const cookies = await this.ctx().storageState();
+
+    const postResponse = await this.ctx().post(`${this.baseUrl}/register.htm`, {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      data: formData.toString(),
+    });
+
+    if (!postResponse.ok()) {
+      throw new ApiError(
+        postResponse.status(),
+        await postResponse.text(),
+        "POST /register.htm",
+      );
+    }
+
+    const body = await postResponse.text();
+    if (body.trim() !== "" && !body.includes("Your account was created successfully")) {
+      throw new ApiError(
+        postResponse.status(),
+        body,
+        "POST /register.htm (HTTP 200 pero sin confirmación de éxito — posible error de validación)",
+      );
+    }
+  }
+
   async registerDuplicateUser(username: string): Promise<void> {
     const params = new URLSearchParams({
-      'customer.firstName': 'Test',
-      'customer.lastName': 'Duplicate',
-      'customer.address.street': '123 Test St',
-      'customer.address.city': 'TestCity',
-      'customer.address.state': 'CA',
-      'customer.address.zipCode': '00000',
-      'customer.phoneNumber': '5550000000',
-      'customer.ssn': '000-00-0000',
-      'customer.username': username,
-      'customer.password': 'password123',
-      'repeatedPassword': 'password123',
+      "customer.firstName": "Test",
+      "customer.lastName": "Duplicate",
+      "customer.address.street": "123 Test St",
+      "customer.address.city": "TestCity",
+      "customer.address.state": "CA",
+      "customer.address.zipCode": "00000",
+      "customer.phoneNumber": "5550000000",
+      "customer.ssn": "000-00-0000",
+      "customer.username": username,
+      "customer.password": "password123",
+      repeatedPassword: "password123",
     });
     await this.post(`/parabank/register.htm?${params.toString()}`);
   }
@@ -215,7 +233,9 @@ export class ApiClient {
   // ── Transactions ───────────────────────────────────────────────────────────
 
   async getTransactionsForAccount(accountId: number): Promise<Transaction[]> {
-    return this.get<Transaction[]>(`/services/bank/accounts/${accountId}/transactions`);
+    return this.get<Transaction[]>(
+      `/services/bank/accounts/${accountId}/transactions`,
+    );
   }
 
   // ── HTTP primitives ────────────────────────────────────────────────────────
@@ -223,7 +243,7 @@ export class ApiClient {
   private ctx(): APIRequestContext {
     if (!this.requestContext) {
       throw new Error(
-        '[ApiClient] requestContext no inicializado. Llamá a init() antes de usar el cliente.',
+        "[ApiClient] requestContext no inicializado. Llamá a init() antes de usar el cliente.",
       );
     }
     return this.requestContext;
@@ -232,11 +252,15 @@ export class ApiClient {
   private async get<T = void>(endpoint: string): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const response = await this.ctx().get(url, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: "application/json" },
     });
 
     if (!response.ok()) {
-      throw new ApiError(response.status(), await response.text(), `GET ${endpoint}`);
+      throw new ApiError(
+        response.status(),
+        await response.text(),
+        `GET ${endpoint}`,
+      );
     }
 
     const text = await response.text();
@@ -248,19 +272,21 @@ export class ApiClient {
   private async post<T = void>(endpoint: string, body?: string): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const response = await this.ctx().post(url, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: "application/json" },
       data: body,
     });
 
     if (!response.ok()) {
-      throw new ApiError(response.status(), await response.text(), `POST ${endpoint}`);
+      throw new ApiError(
+        response.status(),
+        await response.text(),
+        `POST ${endpoint}`,
+      );
     }
 
     const text = await response.text();
     if (!text.trim()) return undefined as T;
 
-    // Algunos endpoints devuelven texto plano (ej: /transfer → "Successfully transferred...")
-    // Si no es JSON válido, retornamos el texto como T para no romper el caller
     try {
       return JSON.parse(text) as T;
     } catch {

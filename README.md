@@ -3,10 +3,10 @@
 Automation framework for Parabank — a demo fintech banking application.
 Built to demonstrate QA engineering depth: architectural decisions, real bug discovery, and production-grade practices.
 
-**Stack:** Playwright + TypeScript | GitHub Actions | Docker | k6  
+**Stack:** Playwright + TypeScript | GitHub Actions | Docker | k6 | Zod  
 **System under test:** [Parabank](https://parabank.parasoft.com) — transfers, loans, bill pay, accounts  
 **Repo:** https://github.com/germanobrian1998/parabank-qa-portfolio  
-**Suite result:** 57/58 passed · 0 real failures · 1 skipped (expected) · 11 confirmed bugs
+**Suite result:** 78/82 passed · 0 real failures · 3 skipped (expected) · 13 confirmed bugs
 
 ---
 
@@ -44,7 +44,7 @@ This framework is my answer to those questions, implemented and validated.
 | Phase 2 | Implementation | ✅ Complete |
 | Phase 3 | Hard cases | ✅ Complete |
 | Phase 4 | Operational maturity | ✅ Complete |
-| Phase 5 | Technical narrative | ✅ Complete |
+| Phase 5 | Technical narrative & gaps | ✅ Complete |
 
 See [METRICS.md](METRICS.md) for full suite breakdown.
 
@@ -88,7 +88,7 @@ The `john` account balance accumulates across test runs. A UI balance diff becom
 
 ## What I found
 
-11 bugs discovered across all phases. Severity defined by business impact, not technical complexity.
+13 bugs discovered across all phases. Severity defined by business impact, not technical complexity.
 
 | ID | Description | Severity | Discovery method |
 |----|-------------|----------|-----------------|
@@ -103,10 +103,42 @@ The `john` account balance accumulates across test runs. A UI balance diff becom
 | H-015 | Server accepts negative loan amounts | Critical | Automated |
 | H-016 | Server accepts $0.00 transfers | Medium | BVA boundary analysis |
 | H-017 | Server accepts self-transfers | Medium | BVA boundary analysis |
+| H-018 | Unauthenticated access to account data via direct API call (IDOR) | Critical | API security test |
+| H-019 | `POST /requestLoan` not idempotent — duplicate requests create multiple LOAN accounts | High | API idempotency test |
 
-H-007, H-010, and H-015 share the same root cause: no server-side numeric validation on financial input fields. H-011 reveals an API/UI contract inconsistency invisible to manual testers — the UI shows success, the server returns an error.
+H-007, H-010, and H-015 share the same root cause: no server-side numeric validation on financial input fields. H-018 is a PCI-DSS requirement 7 violation — any HTTP client with a known `accountId` can read any customer's financial data without authentication.
 
 Full details: [docs/tech-discovery-report.md](docs/tech-discovery-report.md)
+
+---
+
+## Contract testing
+
+API contracts are defined as Zod schemas in `src/contracts/parabank.schemas.ts` and validated in `tests/api/contract.api.spec.ts`. This approach was chosen over Pact because Parabank's HSQLDB cannot guarantee reproducible provider state between contract verifications.
+
+What the contract tests detect:
+- Fields removed from a response (most common breaking change in Java APIs)
+- Type changes — `balance: number` becoming `balance: string` silently breaks all financial calculations
+- New unrecognized enum values in `account.type`
+- Ownership invariant violations — accounts or transactions belonging to a different `customerId` than requested
+
+The schemas also serve as the single source of truth for TypeScript types — `ApiClient.ts` imports types inferred from Zod rather than maintaining parallel manual interfaces.
+
+---
+
+## Environment validation
+
+`tests/smoke/environment.spec.ts` runs 5 checks before the functional suite:
+
+1. Parabank UI responds HTTP 200
+2. REST API authenticates `john/demo`
+3. John has at least one account
+4. Loan provider WSDL approves at least one request
+5. Account balances are within reasonable range (no DB contamination from stress tests)
+
+These tests catch the two most common failure modes in this project: corrupted WSDL state (P-002 symptom) and DB contamination from k6 stress runs. Both produce symptoms indistinguishable from real bugs without this gate.
+
+**If tests 4 or 5 fail:** `docker compose down -v && docker compose up -d`
 
 ---
 
@@ -120,7 +152,7 @@ Automated testing has a cost. These are the cases I decided not to automate and 
 
 **Password strength validation** — No documented policy exists in the UI. Automating against an assumed behavior, not a specified one.
 
-**Full WCAG 2.1 AA certification** — axe-core found 26 violations. Full certification requires the application to be fixed first; the violations are documented with business impact in [docs/accessibility-report.md](docs/accessibility-report.md).
+**Full WCAG 2.1 AA certification** — axe-core found 26 violations. Full certification requires the application to be fixed first; the violations are documented with business impact in [docs/accessibility-report.md](docs/accessibility-report.md). Accessibility regression tests are active and will fail if new violations are introduced above the documented baseline.
 
 **Loan processor under load** — The endpoint takes up to 31 seconds under normal conditions. Load testing requires infrastructure that accurately simulates the DB bottleneck; k6 stress testing was applied to transfers (highest-volume path) instead.
 
@@ -128,13 +160,13 @@ Automated testing has a cost. These are the cases I decided not to automate and 
 
 ## Metrics
 
-KPIs defined in Phase 1, measured at Phase 4 close.
+KPIs defined in Phase 1, measured at Phase 5 close.
 
 | KPI | Target | Actual |
 |-----|--------|--------|
 | Suite execution time (Docker) | < 5 min | ~3.5 min |
 | Real failures in CI | 0 | 0 |
-| Bugs found through automation | ≥ 5 | 11 |
+| Bugs found through automation | ≥ 5 | 13 |
 | Reproducibility (zero-to-results) | < 10 min | ~8 min |
 
 Performance baseline (k6):
@@ -145,7 +177,27 @@ Performance baseline (k6):
 | Transfer stress (20 VUs) | p95 | 20ms | 500ms ✅ |
 | Accounts soak (2 min) | p99 | 27ms | 3000ms ✅ |
 
-Accessibility: 26 WCAG 2.1 AA violations across 5 pages — documented as warnings, not suite failures.
+Accessibility: 26 WCAG 2.1 AA violations across 5 pages — documented as baseline thresholds. Tests fail if new violations are introduced.
+
+---
+
+## CI/CD pipeline
+
+### On every push / PR
+smoke (< 3 min) ──► full suite (< 15 min)
+
+└──► performance (parallel, continue-on-error)
+
+The smoke job acts as a gate: full suite and performance only run if smoke passes. A performance threshold failure does not block a merge — it is informational.
+
+### Nightly (3am UTC)
+schedule ──► full suite ──► metrics delta ──► artifacts (30-day retention)
+
+└──► performance (parallel, continue-on-error)
+
+The nightly detects changes in the system under test that do not come from code changes — third-party API contract drift, Docker image changes, dependency updates. Metrics delta compares the current run against the previous one and flags new real failures.
+
+See [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and [`.github/workflows/nightly.yml`](.github/workflows/nightly.yml).
 
 ---
 
@@ -187,35 +239,46 @@ npx playwright test --grep "@smoke"
 # Single spec
 npx playwright test tests/e2e/auth.spec.ts
 
+# Environment validation
+npx playwright test tests/smoke/environment.spec.ts
+
+# Contract tests only
+npx playwright test tests/api/contract.api.spec.ts
+
+# Generate metrics report with delta
+npx ts-node scripts/generate-report.ts
+
 # Performance (requires k6 + Grafana Cloud auth)
 k6 cloud run --local-execution tests/performance/login.baseline.k6.js
 k6 cloud run --local-execution tests/performance/transfer.stress.k6.js
 k6 cloud run --local-execution tests/performance/accounts.soak.k6.js
-
-# Generate metrics report
-npx ts-node scripts/generate-report.ts
 ```
 
 ---
 
 ## Documentation
 
-- [Tech Discovery Report](docs/tech-discovery-report.md) — H-007 to H-017, architectural findings
+- [Tech Discovery Report](docs/tech-discovery-report.md) — H-007 to H-019, architectural findings
+- [Testing Methodology](docs/testing-methodology.md) — three-phase approach, verification discipline, stack decisions
 - [BVA — Transfers Module](docs/bva-transfers-module.md) — decision table with real server states
 - [Performance Baseline](docs/performance-baseline.md) — measured numbers for 3 k6 scenarios
 - [Accessibility Report](docs/accessibility-report.md) — 26 WCAG 2.1 AA violations with business impact
 - [Not Automated](docs/not-automated.md) — 5 cases excluded with cost/risk justification
 - [Lessons Learned](docs/lessons-learned.md) — honest retrospective on the process
 - [PCI-DSS Coverage](docs/pci-dss-coverage.md) — SAQ A control mapping to test suite and documented bugs
-- [CHANGELOG](CHANGELOG.md) — technical history v0.1.0 → v0.5.0
+- [CHANGELOG](CHANGELOG.md) — technical history v0.1.0 → v0.8.0
 
 ---
 
 ## Known issues & troubleshooting
 
+### Environment smoke tests fail (tests 4 or 5)
+**Cause:** DB contaminated by k6 stress runs, or WSDL loan provider state corrupted.  
+**Fix:** `docker compose down -v && docker compose up -d`
+
 ### `transfer_error_rate: 100%` in k6 stress test
 **Cause:** Docker image has dirty DB — source account has negative balance from previous stress test runs.  
-**Fix:** Re-seed the image following the process in [CHANGELOG.md](CHANGELOG.md) (v0.3.0 Technical Notes).
+**Fix:** Re-seed the image: `docker compose down -v && docker compose up -d`
 
 ### `Target page, context or browser has been closed`
 **Cause:** Explicit logout in fixture teardown closes the context before Playwright can clean it up.  
@@ -223,8 +286,12 @@ npx ts-node scripts/generate-report.ts
 
 ### `#loanRequestApproved` never appears (timeout in loans.spec.ts)
 **Cause:** `waitForSelector` with `state: 'visible'` doesn't work with jQuery — it doesn't set `display` inline.  
-**Fix:** Use `waitForFunction` with `getComputedStyle(el).display !== 'none'` and timeout 60_000ms. The loan processor can take up to 31 seconds to respond.
+**Fix:** Use `waitForFunction` with `getComputedStyle(el).display !== 'none'` and timeout 60,000ms. The loan processor can take up to 31 seconds to respond.
 
 ### Suite fails with `ECONNREFUSED` inside Docker
 **Cause:** URLs hardcoded to `localhost:9090` — inside Docker, `localhost` doesn't resolve to Parabank.  
 **Fix:** All URLs read from `process.env.BASE_URL`. The compose file sets `BASE_URL=http://parabank:8080` automatically.
+
+### `POST /register.htm` returns "This username already exists" for new usernames
+**Cause (P-004):** Playwright's `APIRequestContext` reuses session state between requests in the same process. The server compares the submitted username against a `Customer` object pre-populated in Spring MVC `@SessionAttributes` during the prior GET — making any new username appear as a duplicate. Works correctly with curl.  
+**Workaround:** Use the browser-based registration flow (`tests/e2e/auth.spec.ts`) instead of the API client for registration. The API contract test is marked `test.skip()` pending a fix.

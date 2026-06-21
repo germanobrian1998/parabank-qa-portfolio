@@ -76,10 +76,23 @@ test.describe('Authorization — cross-user data access prevention', () => {
     // en APIs bancarias. Si el servidor solo verifica "¿estás autenticado?"
     // pero no "¿esta cuenta te pertenece?", el acceso cross-user es posible.
     //
-    // Limitación del entorno: Parabank seed tiene un único usuario conocido
-    // (john/demo). Para el segundo usuario se usa una cuenta recién registrada
-    // con datos mínimos. Si el registro vía API no está disponible en esta
-    // instancia, el test lo reporta explícitamente y se omite.
+    // BLOCKED (P-004): el registro de un segundo usuario es necesario para
+    // este test, y actualmente falla en esta instancia de Docker local.
+    // IMPORTANTE: no es por un problema de contrato de API (eso ya se
+    // resolvió, ver P-003 — ApiClient.register() implementa el GET previo
+    // de sesión y POST con form data en el body, confirmado funcional con
+    // curl puro). El bloqueo real es que el servidor rechaza CUALQUIER
+    // username nuevo con "This username already exists" — un falso positivo
+    // confirmado: el login posterior con esas credenciales falla con
+    // "could not be verified", probando que el usuario nunca se creó.
+    // Ver PENDING.md P-004 para el detalle completo de la investigación.
+    test.skip(
+      true,
+      'BLOCKED (P-004): el servidor rechaza el registro de cualquier username ' +
+      'nuevo con "already exists" (falso positivo confirmado — el usuario nunca ' +
+      'se crea). No es un problema de contrato de API: confirmado roto incluso ' +
+      'con curl puro, sin pasar por Playwright ni ApiClient. Ver PENDING.md P-004.'
+    );
 
     const clientA = new ApiClient();
     const clientB = new ApiClient();
@@ -93,54 +106,29 @@ test.describe('Authorization — cross-user data access prevention', () => {
       const accountsA = await clientA.getAccountsForCustomer(customerA.id);
       const accountIdFromA = accountsA[0].id;
 
-      // Usuario B: registrar un usuario dinámico para garantizar aislamiento
-      // Si el registro falla (instancia sin endpoint activo), se documenta
-      // y el test se omite con skip — no falla el CI por razón de entorno.
-      let customerBId: number;
+      // Usuario B: registrar un usuario dinámico para garantizar aislamiento.
+      // register() encapsula el contrato real del endpoint (GET previo para
+      // sesión + POST con form data en el body) — ver ApiClient.register()
+      // y PENDING.md P-003. El contrato es correcto; lo que falla es el
+      // estado del servidor (P-004), no esta llamada.
+      const uniqueSuffix = Date.now();
+      const usernameB = `testuser_${uniqueSuffix}`;
 
-      try {
-        const uniqueSuffix = Date.now();
-        const registrationParams = new URLSearchParams({
-          'customer.firstName': 'Test',
-          'customer.lastName': 'UserB',
-          'customer.address.street': '456 Test Ave',
-          'customer.address.city': 'TestCity',
-          'customer.address.state': 'NY',
-          'customer.address.zipCode': '10001',
-          'customer.phoneNumber': '5559990000',
-          'customer.ssn': '999-99-9999',
-          'customer.username': `testuser_${uniqueSuffix}`,
-          'customer.password': 'Password123',
-          'repeatedPassword': 'Password123',
-        });
+      await clientB.register({
+        firstName: 'Test',
+        lastName: 'UserB',
+        street: '456 Test Ave',
+        city: 'TestCity',
+        state: 'NY',
+        zipCode: '10001',
+        phoneNumber: '5559990000',
+        ssn: '99999',
+        username: usernameB,
+        password: 'Password123',
+      });
 
-        // Intentar registro — puede no estar disponible en todas las instancias
-        const registerClient = new ApiClient();
-        await registerClient.init();
-        try {
-          // POST al endpoint de registro de Parabank
-          // Si devuelve error o no existe, se captura abajo
-          const regResponse = await (registerClient as any).post(
-            `/register.htm?${registrationParams.toString()}`
-          );
-        } finally {
-          await registerClient.dispose();
-        }
-
-        const customerB = await clientB.login(`testuser_${uniqueSuffix}`, 'Password123');
-        customerBId = customerB.id;
-
-      } catch {
-        // El registro no está disponible en esta instancia de Parabank.
-        // Se omite el test cross-user — no es un fallo del sistema bajo prueba.
-        test.skip(
-          true,
-          'No se pudo crear usuario B vía API. ' +
-          'Verificar que el endpoint de registro esté activo en esta instancia de Parabank. ' +
-          'El vector de acceso sin autenticación está cubierto por el test anterior.'
-        );
-        return;
-      }
+      const customerB = await clientB.login(usernameB, 'Password123');
+      const customerBId = customerB.id;
 
       // Usuario B intenta acceder a una cuenta de A
       await expect(

@@ -1,6 +1,6 @@
 // tests/accessibility/a11y.spec.ts
 //
-// Auditoría de accessibility para Parabank — WCAG 2.1 nivel AA.
+// Auditoría de accessibility para Parabank — WCAG 2.1 AA.
 //
 // SCOPE: páginas de mayor riesgo en una aplicación bancaria.
 // No auditamos todas las páginas — priorizamos por impacto de negocio:
@@ -20,8 +20,13 @@
 // tiene un problema técnico: tiene un problema legal (ADA, Section 508)
 // y excluye activamente a una parte de su base de clientes.
 //
-// DECISIÓN: los tests NO fallan por violations — reportan como warnings.
-// Ver src/helpers/assertions.ts → auditAccessibility() para justificación.
+// REGRESIÓN DE BASELINE:
+// Cada página tiene un threshold de violations documentado en
+// docs/accessibility-report.md. Los tests fallan si el número de
+// violations supera el baseline — detecta violations nuevos introducidos
+// en un cambio sin requerir que el equipo resuelva los históricos primero.
+// Baseline medido el 19/06/2026 contra germanobrian1998/parabank:latest:
+//   Login: 5 | Register: 5 | Transfer: 6 | Bill Pay: 6 | Accounts: 4
 
 import { test } from '@playwright/test';
 import { auditAccessibility, AccessibilityViolation } from '../../src/helpers/assertions';
@@ -33,7 +38,6 @@ const allViolations: Record<string, AccessibilityViolation[]> = {};
 test.describe('Accessibility audit — WCAG 2.1 AA', () => {
 
   test.afterAll(() => {
-    // Resumen al final de la suite para visibilidad en CI
     const totalViolations = Object.values(allViolations)
       .reduce((sum, v) => sum + v.length, 0);
 
@@ -66,7 +70,10 @@ test.describe('Accessibility audit — WCAG 2.1 AA', () => {
     const loginPage = new LoginPage(page);
     await loginPage.navigate();
 
-    allViolations['Login page'] = await auditAccessibility(page, 'Login page');
+    allViolations['Login page'] = await auditAccessibility(page, 'Login page', {
+      maxViolations: 5,
+      warnOnly: false,
+    });
   });
 
   // ── Register page ──────────────────────────────────────────────────────────
@@ -78,7 +85,10 @@ test.describe('Accessibility audit — WCAG 2.1 AA', () => {
 
     await page.goto('/parabank/register.htm');
 
-    allViolations['Register page'] = await auditAccessibility(page, 'Register page');
+    allViolations['Register page'] = await auditAccessibility(page, 'Register page', {
+      maxViolations: 5,
+      warnOnly: false,
+    });
   });
 
   // ── Transfer page (authenticated) ──────────────────────────────────────────
@@ -94,7 +104,10 @@ test.describe('Accessibility audit — WCAG 2.1 AA', () => {
     await loginPage.login({ username: 'john', password: 'demo' });
     await page.goto('/parabank/transfer.htm');
 
-    allViolations['Transfer page'] = await auditAccessibility(page, 'Transfer page');
+    allViolations['Transfer page'] = await auditAccessibility(page, 'Transfer page', {
+      maxViolations: 6,
+      warnOnly: false,
+    });
   });
 
   // ── Bill Pay page (authenticated) ──────────────────────────────────────────
@@ -110,7 +123,10 @@ test.describe('Accessibility audit — WCAG 2.1 AA', () => {
     await loginPage.login({ username: 'john', password: 'demo' });
     await page.goto('/parabank/billpay.htm');
 
-    allViolations['Bill Pay page'] = await auditAccessibility(page, 'Bill Pay page');
+    allViolations['Bill Pay page'] = await auditAccessibility(page, 'Bill Pay page', {
+      maxViolations: 6,
+      warnOnly: false,
+    });
   });
 
   // ── Accounts overview (authenticated) ──────────────────────────────────────
@@ -125,7 +141,10 @@ test.describe('Accessibility audit — WCAG 2.1 AA', () => {
     await loginPage.login({ username: 'john', password: 'demo' });
     await page.goto('/parabank/overview.htm');
 
-    allViolations['Accounts overview'] = await auditAccessibility(page, 'Accounts overview');
+    allViolations['Accounts overview'] = await auditAccessibility(page, 'Accounts overview', {
+      maxViolations: 4,
+      warnOnly: false,
+    });
   });
 
 });
