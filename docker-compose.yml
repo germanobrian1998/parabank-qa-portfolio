@@ -14,6 +14,7 @@ services:
 
   playwright:
     image: mcr.microsoft.com/playwright:v1.60.0-noble
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     depends_on:
       parabank:
         condition: service_healthy
@@ -23,5 +24,6 @@ services:
     working_dir: /app
     environment:
       - BASE_URL=http://parabank:8080
+      - HOME=/tmp
     command: >
       sh -c "npm ci && npx playwright test --reporter=list,junit"

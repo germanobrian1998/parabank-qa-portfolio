@@ -1,0 +1,185 @@
+# .github/workflows/nightly.yml
+#
+# Nightly regression workflow para el portfolio QA de Parabank.
+#
+# PROPÓSITO:
+# Detectar cambios en el sistema bajo prueba que no vinieron de un cambio
+# de código propio. En fintech, las APIs de terceros, las imágenes Docker,
+# y las dependencias pueden cambiar su comportamiento sin aviso — el nightly
+# lo detecta en horas, no en días.
+#
+# DIFERENCIA CON CI:
+# ci.yml corre en cada push/PR para validar cambios propios.
+# nightly.yml corre a las 3am UTC todos los días para detectar cambios externos.
+# El nightly corre la suite completa (no solo smoke) y genera un reporte
+# con delta de métricas respecto a la corrida anterior.
+#
+# RETENCIÓN:
+# Los artefactos del nightly tienen retención de 30 días (vs 7-14 en CI)
+# para permitir comparaciones históricas de regresión.
+
+name: Nightly Regression
+
+on:
+  schedule:
+    # 3am UTC todos los días
+    - cron: '0 3 * * *'
+  # Permite correr manualmente desde la UI de GitHub Actions
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ─── Nightly Full Suite ────────────────────────────────────────────────────
+  # Corre la suite completa con reporte HTML + JUnit XML + delta de métricas.
+  # No hay gate de smoke previo — el nightly siempre corre todo para tener
+  # visibilidad completa del estado del sistema bajo prueba.
+
+  nightly:
+    name: Nightly Full Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      - name: Start Parabank
+        run: |
+          docker run -d \
+            --name parabank \
+            -p 9090:8080 \
+            germanobrian1998/parabank:latest
+
+      - name: Wait for Parabank to be ready
+        # Timeout de 90s — Parabank tarda ~30-60s en levantar Tomcat + HSQLDB.
+        # Si no levanta, se loguean los últimos 50 líneas del contenedor para
+        # diagnóstico antes de fallar.
+        run: |
+          echo "Waiting for Parabank to be available at http://localhost:9090..."
+          for i in $(seq 1 18); do
+            if curl -sf http://localhost:9090/parabank/index.htm > /dev/null; then
+              echo "Parabank is ready after $((i * 5))s"
+              exit 0
+            fi
+            echo "  attempt $i/18 — not ready yet, waiting 5s..."
+            sleep 5
+          done
+          echo "ERROR: Parabank did not start within 90 seconds"
+          docker logs parabank
+          exit 1
+
+      - name: Run full suite
+        # continue-on-error: false — el nightly debe reportar fallos reales.
+        # A diferencia de performance (continue-on-error: true en CI), los
+        # fallos funcionales nocturnos sí son señal de acción requerida.
+        run: npx playwright test --reporter=html,github
+        env:
+          CI: true
+
+      - name: Generate metrics report with delta
+        # if: always() — el reporte se genera incluso si la suite falló,
+        # para tener visibilidad del delta aunque haya regresiones.
+        if: always()
+        run: npx ts-node scripts/generate-report.ts
+
+      - name: Upload nightly HTML report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: nightly-report-${{ github.run_number }}
+          path: playwright-report/
+          # 30 días — retención mayor que CI para permitir comparaciones
+          # históricas entre corridas nocturnas
+          retention-days: 30
+
+      - name: Upload nightly metrics
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: nightly-metrics-${{ github.run_number }}
+          path: METRICS.md
+          retention-days: 30
+
+      - name: Upload JUnit XML
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: nightly-junit-${{ github.run_number }}
+          path: test-results/results.xml
+          retention-days: 30
+
+  # ─── Nightly Performance ───────────────────────────────────────────────────
+  # Corre los scripts k6 después de la suite funcional.
+  # No depende del resultado de nightly (no usa needs:) — si la suite
+  # funcional falla, igual queremos medir performance para diagnosticar
+  # si el problema es funcional o de carga.
+  #
+  # continue-on-error: true — igual que en CI, un fallo de threshold
+  # de performance es informativo, no bloqueante.
+
+  nightly-performance:
+    name: Nightly Performance Baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring \
+            --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Start Parabank
+        run: |
+          docker run -d \
+            --name parabank \
+            -p 9090:8080 \
+            germanobrian1998/parabank:latest
+
+      - name: Wait for Parabank to be ready
+        run: |
+          echo "Waiting for Parabank to be available at http://localhost:9090..."
+          for i in $(seq 1 18); do
+            if curl -sf http://localhost:9090/parabank/index.htm > /dev/null; then
+              echo "Parabank is ready after $((i * 5))s"
+              exit 0
+            fi
+            echo "  attempt $i/18 — not ready yet, waiting 5s..."
+            sleep 5
+          done
+          echo "ERROR: Parabank did not start within 90 seconds"
+          docker logs parabank
+          exit 1
+
+      - name: Run login baseline
+        run: k6 run tests/performance/login.baseline.k6.js
+
+      - name: Run transfer stress test
+        run: k6 run tests/performance/transfer.stress.k6.js
+
+      - name: Run accounts soak test
+        run: k6 run tests/performance/accounts.soak.k6.js

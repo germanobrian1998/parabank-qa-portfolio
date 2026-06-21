@@ -45,25 +45,31 @@ export async function expectLoanDecisionPresent(page: Page): Promise<void> {
 /**
  * Analiza la página actual con axe-core y retorna los violations encontrados.
  *
- * DECISIÓN DE DISEÑO: esta función NO lanza una excepción si hay violations.
- * Razón: Parabank es una app legacy — forzar los tests funcionales a fallar
- * por violations de a11y mezcla dos concerns distintos y enmascara fallos
- * funcionales reales. Los violations se reportan como advertencias separadas
- * en el accessibility report.
+ * DECISIÓN DE DISEÑO: por defecto esta función NO lanza excepción si hay
+ * violations (`warnOnly: true`). Razón: Parabank es una app legacy — forzar
+ * los tests funcionales a fallar por violations de a11y mezcla dos concerns
+ * distintos y enmascara fallos funcionales reales.
  *
- * Uso: llamar al final de un test funcional que ya verificó el estado correcto
- * de la página. El caller decide qué hacer con los violations retornados.
+ * Cuando se pasa `maxViolations` con `warnOnly: false`, la función actúa como
+ * regresión de accessibility: falla si el número de violations supera el
+ * baseline conocido. Esto detecta violations nuevos introducidos en un cambio
+ * sin requerir que el equipo resuelva los violations históricos primero.
  *
- * @param page - La página de Playwright en su estado actual
- * @param context - Nombre descriptivo de la página/estado para el reporte
+ * @param page       - La página de Playwright en su estado actual
+ * @param context    - Nombre descriptivo de la página/estado para el reporte
+ * @param options    - maxViolations: threshold; warnOnly: nunca falla (default)
  * @returns Array de violations encontrados (vacío si ninguno)
  */
 export async function auditAccessibility(
   page: Page,
   context: string,
+  options: {
+    maxViolations?: number;
+    warnOnly?: boolean;
+  } = { warnOnly: true },
 ): Promise<AccessibilityViolation[]> {
   const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa']) // WCAG 2.1 nivel AA — estándar para fintech
+    .withTags(['wcag2a', 'wcag2aa'])
     .analyze();
 
   if (results.violations.length > 0) {
@@ -81,13 +87,26 @@ export async function auditAccessibility(
     });
   }
 
-  return results.violations.map((v) => ({
+  const violations = results.violations.map((v) => ({
     id: v.id,
     impact: v.impact ?? 'unknown',
     description: v.description,
     helpUrl: v.helpUrl,
     nodes: v.nodes.map((n) => n.html.slice(0, 200)),
   }));
+
+  if (!options.warnOnly && options.maxViolations !== undefined) {
+    expect(
+      violations.length,
+      `[A11Y REGRESSION] ${context}: ${violations.length} violation(s) found, ` +
+      `max allowed is ${options.maxViolations}.\n` +
+      `New violations were introduced above the documented baseline.\n` +
+      `Run the accessibility audit to identify them: npx playwright test tests/accessibility/\n` +
+      `Baseline documented in docs/accessibility-report.md`,
+    ).toBeLessThanOrEqual(options.maxViolations);
+  }
+
+  return violations;
 }
 
 export interface AccessibilityViolation {
