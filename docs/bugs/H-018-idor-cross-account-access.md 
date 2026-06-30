@@ -1,0 +1,148 @@
+# Bug Report — H-018: Unauthenticated Access to Account and Customer Data via REST API
+
+| Field | Value |
+|---|---|
+| **Bug ID** | H-018 |
+| **Title** | REST API exposes account balances and customer data without authentication (IDOR) |
+| **Severity** | Critical |
+| **Priority** | P1 |
+| **Type** | Security — Broken Access Control |
+| **Status** | Confirmed / Open |
+| **Reported By** | QA Engineer |
+| **Date Reported** | 2026-06-06 |
+| **Last Updated** | 2026-06-06 |
+| **Affected Component** | REST API — `/services/bank/accounts/` · `/services/bank/customers/` |
+| **OWASP Classification** | A01:2021 — Broken Access Control (IDOR) |
+| **Regulatory Mapping** | PCI-DSS Requirement 7 — Restrict access to system components and cardholder data by business need to know |
+
+---
+
+## Environment
+
+| Property | Value |
+|---|---|
+| **SUT** | Parabank Banking Demo |
+| **Image** | `germanobrian1998/parabank:latest` |
+| **Base URL** | `http://localhost:8080/parabank` |
+| **Auth mechanism** | Session-based (JSESSIONID cookie) |
+| **Test file** | `tests/api/authorization.api.spec.ts` |
+
+---
+
+## Preconditions
+
+- Parabank Docker container is running and healthy
+- No active session is required — this bug is reproducible without any prior authentication
+- The `accountId` and `customerId` values used below correspond to the seeded dataset in `germanobrian1998/parabank:latest`
+
+---
+
+## Steps to Reproduce
+
+### Vector 1 — Account data access without session
+
+1. Start a Parabank instance: `docker run -d -p 8080:8080 germanobrian1998/parabank:latest`
+2. Send the following request with no cookies or authentication headers:
+
+```http
+GET /parabank/services/bank/accounts/12345 HTTP/1.1
+Host: localhost:8080
+Accept: application/json
+```
+
+3. Observe the HTTP response.
+
+### Vector 3 — Full account enumeration by customer ID without session
+
+1. Using the same unauthenticated context, send:
+
+```http
+GET /parabank/services/bank/customers/12212/accounts HTTP/1.1
+Host: localhost:8080
+Accept: application/json
+```
+
+2. Observe the HTTP response.
+
+> **Note:** Vector 2 (cross-user IDOR — accessing another user's accounts while authenticated as a different user) is documented in `authorization.api.spec.ts` as `test.skip()`. It requires a second registered user and is a separate verification step.
+
+---
+
+## Expected Result
+
+Both endpoints should enforce authentication before returning any data:
+
+- Without a valid `JSESSIONID`: **HTTP 401 Unauthorized**
+- With a valid session but requesting resources belonging to a different customer: **HTTP 403 Forbidden**
+
+No financial data should be returned to unauthenticated callers.
+
+---
+
+## Actual Result
+
+### Vector 1 — HTTP 200 with full account details:
+
+```json
+{
+  "id": 12345,
+  "customerId": 12212,
+  "type": "CHECKING",
+  "balance": -6001001053.06
+}
+```
+
+### Vector 3 — HTTP 200 with full account list including balances:
+
+```json
+[
+  { "id": 12345, "customerId": 12212, "type": "CHECKING", "balance": -6001001053.06 },
+  { "id": 12456, "customerId": 12212, "type": "CHECKING", "balance": 6000994563.51 },
+  ...
+]
+```
+
+Ten or more accounts with live balance data are returned with no authentication required.
+
+---
+
+## Impact Analysis
+
+**Attack vector:** `customerId` is a sequential integer (seed value: `12212`). An attacker can iterate over a numeric range with a simple script and extract the complete financial profile of every customer in the system — account IDs, account types, and current balances — without any credentials.
+
+**Business impact in a production context:**
+- Unauthorized disclosure of account balances and account structure for all customers
+- `customerId` → `accountId` correlation enables targeted follow-on attacks (unauthorized transfers, social engineering)
+- Violation of financial data confidentiality obligations under PCI-DSS and applicable banking regulations
+
+**Root cause pattern:** Parabank enforces authentication at the login endpoint but does not apply authorization checks at the resource level. This is a textbook IDOR (Insecure Direct Object Reference) — the application trusts the caller-supplied ID without verifying that the authenticated session has permission to access that resource. In this case, no session is required at all.
+
+---
+
+## Evidence
+
+| Artifact | Location |
+|---|---|
+| Automated test (Vector 1) | `tests/api/authorization.api.spec.ts` — marked `test.fail()` |
+| Automated test (Vector 3) | `tests/api/authorization.api.spec.ts` — marked `test.fail()` |
+| Narrative discovery notes | `docs/tech-discovery-report.md` — section H-018 |
+| PCI-DSS mapping | `docs/pci-dss-coverage.md` — Requirement 7 |
+
+---
+
+## Workaround
+
+None available from the client side. The vulnerability exists at the server layer. Mitigation requires:
+
+1. Adding an authentication guard to all `/services/bank/` REST endpoints — reject requests without a valid `JSESSIONID` with HTTP 401
+2. Adding an authorization check — verify that the `customerId` or `accountId` in the request path belongs to the authenticated session's user before returning data
+
+---
+
+## Regulatory Mapping
+
+| Standard | Requirement | Relevance |
+|---|---|---|
+| PCI-DSS | Requirement 7.1 — Limit access to system components and cardholder data to only those individuals whose job requires such access | Direct violation — any anonymous caller can read account data |
+| PCI-DSS | Requirement 7.2 — Establish an access control system that includes coverage of all system components | The REST API layer has no access control |
+| OWASP Top 10 | A01:2021 — Broken Access Control | IDOR is listed as a primary sub-category |

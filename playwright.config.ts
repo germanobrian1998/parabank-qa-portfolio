@@ -68,11 +68,25 @@ export default defineConfig({
 
   projects: [
     {
+      // Smoke corre primero, como gate, contra la DB recién seedeada —
+      // antes de que cualquier otro test (api/, e2e/, edge-cases/) la toque.
+      // Sin esto, Playwright recorre los archivos en orden alfabético de
+      // carpeta y smoke/ termina corriendo último, validando un estado ya
+      // modificado por tests previos en vez del seed original.
+      // Ver docs/lessons-learned.md — "Smoke gate ordering" para el caso
+      // real que motivó este cambio.
+      name: "smoke",
+      testMatch: /tests\/smoke\/.*\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
       // Chromium only — deliberate scope for a demo portfolio.
       // Cross-browser testing would require additional CI infrastructure
       // outside the scope of this project.
       name: "chromium",
+      testMatch: /tests\/(?!smoke\/).*\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
+      dependencies: ["smoke"],
     },
   ],
 });
