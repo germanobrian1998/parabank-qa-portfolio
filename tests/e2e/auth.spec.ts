@@ -48,12 +48,6 @@ test.describe("Registration — new customer onboarding", () => {
   test("[BUG] should allow login with newly registered credentials", async ({
     page,
   }) => {
-    // WHY THIS TEST MATTERS:
-    // Registration and login must be consistent — a newly registered
-    // user must be able to log in immediately after registration.
-    // Parabank registers successfully but rejects login with same
-    // credentials — confirmed bug.
-
     test.fail(
       true,
       "Parabank registers user successfully but rejects immediate login with same credentials",
@@ -77,21 +71,14 @@ test.describe("Registration — new customer onboarding", () => {
   test("[BUG] should reject registration with duplicate username", async ({
     page,
   }) => {
-    // WHY THIS TEST MATTERS:
-    // Duplicate usernames allow account confusion or takeover scenarios.
-    // A bank system must enforce unique identifiers at registration time.
-    // Parabank accepts duplicate usernames — confirmed security bug.
-
     test.fail(true, "Parabank accepts duplicate usernames — security bug");
 
     const registerPage = new RegisterPage(page);
     const sharedUsername = `dup_user_${Date.now()}`;
 
-    // Primer registro: debe tener éxito
     await registerPage.navigate();
     await registerPage.register(UserFactory.withUsername(sharedUsername));
 
-    // Segundo registro con el mismo username: debe ser rechazado
     await registerPage.navigate();
 
     await expect(async () => {
@@ -102,11 +89,6 @@ test.describe("Registration — new customer onboarding", () => {
   test("[BUG] should show validation error when required fields are empty", async ({
     page,
   }) => {
-    // WHY THIS TEST MATTERS:
-    // Empty field submission tests client-side AND server-side validation.
-    // If only client-side validation exists, API calls bypass it entirely.
-    // Parabank only validates client-side — confirmed validation gap.
-
     test.fail(
       true,
       "Parabank accepts registration with empty fields — server-side validation gap",
@@ -129,7 +111,7 @@ test.describe("Registration — new customer onboarding", () => {
 });
 
 test.describe("Login — customer authentication", () => {
-  test("should authenticate with valid credentials and show account overview @smoke", async ({
+  test("should authenticate with valid credentials and show account overview @smoke @sanity", async ({
     page,
   }) => {
     // WHY THIS TEST MATTERS:
@@ -137,6 +119,9 @@ test.describe("Login — customer authentication", () => {
     // Failure here means zero operations can be performed.
     // We use the demo account (john/demo) as stable fixture
     // to avoid dependency on dynamic registration in smoke tests.
+    //
+    // @sanity: login is the prerequisite for every other feature.
+    // A post-deploy sanity run must verify this before anything else.
 
     const authPage = new AuthPage(page);
 
@@ -159,10 +144,6 @@ test.describe("Login — customer authentication", () => {
   });
 
   test("should reject login with incorrect password", async ({ page }) => {
-    // WHY THIS TEST MATTERS:
-    // Authentication must reject wrong passwords to prevent unauthorized access.
-    // A banking app that accepts any password is a critical security failure.
-
     const authPage = new AuthPage(page);
 
     await expect(async () => {
@@ -174,11 +155,6 @@ test.describe("Login — customer authentication", () => {
   });
 
   test("should reject login with non-existent username", async ({ page }) => {
-    // WHY THIS TEST MATTERS:
-    // The system must not leak information about which usernames exist.
-    // Ideally the error message is generic — same for wrong user and wrong password.
-    // This test verifies rejection; error message consistency is a separate concern.
-
     const authPage = new AuthPage(page);
 
     await expect(async () => {
@@ -190,10 +166,6 @@ test.describe("Login — customer authentication", () => {
   });
 
   test("should reject login with empty credentials", async ({ page }) => {
-    // WHY THIS TEST MATTERS:
-    // Empty credential submission should never succeed.
-    // Verifies that the form doesn't bypass validation on empty submit.
-
     const authPage = new AuthPage(page);
 
     await expect(async () => {
@@ -203,13 +175,17 @@ test.describe("Login — customer authentication", () => {
 });
 
 test.describe("Logout — session termination", () => {
-  test("should log out and redirect to public page @smoke", async ({
+  test("should log out and redirect to public page @smoke @sanity", async ({
     page,
   }) => {
     // WHY THIS TEST MATTERS:
     // Logout must terminate the session and return the user to a public page.
     // Failure here means sessions persist after user intent to end them,
     // which is a security risk on shared devices.
+    //
+    // @sanity: session termination is a critical security control.
+    // A post-deploy sanity run must verify that logout works before
+    // declaring the deployment stable.
 
     const authPage = new AuthPage(page);
 
@@ -226,11 +202,6 @@ test.describe("Logout — session termination", () => {
   test("[BUG H-009] should not allow access to protected pages after logout", async ({
     page,
   }) => {
-    // WHY THIS TEST MATTERS:
-    // Post-logout access to /overview.htm confirms H-009 from discovery:
-    // server-side session invalidation is not working.
-    // This test is expected to FAIL, documenting the security bug.
-
     test.fail(
       true,
       "H-009: Session not invalidated server-side after logout — protected pages remain accessible",
@@ -251,10 +222,6 @@ test.describe("Logout — session termination", () => {
   });
 
   test("should not show logout link on public pages", async ({ page }) => {
-    // WHY THIS TEST MATTERS:
-    // Visual consistency: a logged-out user should not see
-    // authenticated navigation elements. Indicates clean session state.
-
     const authPage = new AuthPage(page);
 
     await authPage.login({ username: "john", password: "demo" });
