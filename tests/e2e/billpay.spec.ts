@@ -285,13 +285,15 @@ test.describe("Bill Pay — integridad con otras operaciones", () => {
     const transactionRows = page.locator("table tbody tr").filter({
       hasText: /Bill Payment|Funds Transfer/,
     });
-    const count = await transactionRows.count();
 
-    expect(
-      count,
+    // expect(locator).toHaveCount() reintenta automáticamente hasta timeout,
+    // a diferencia de leer .count() una sola vez de forma síncrona (race condition
+    // con el AJAX que pinta la fila de la transacción recién creada).
+    await expect(
+      transactionRows,
       `Account ${fromAccountId} shows 0 transactions after bill payment — ` +
         `payment may not have been recorded in the transaction ledger.`,
-    ).toBeGreaterThan(0);
+    ).not.toHaveCount(0, { timeout: 10_000 });
   });
 
   test("[BUG H-009] should not allow bill pay to unauthenticated user", async ({

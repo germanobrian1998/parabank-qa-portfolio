@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   parabank:
     image: germanobrian1998/parabank:latest
@@ -15,6 +13,7 @@ services:
   playwright:
     image: mcr.microsoft.com/playwright:v1.60.0-noble
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    profiles: ["containerized-run"]
     depends_on:
       parabank:
         condition: service_healthy

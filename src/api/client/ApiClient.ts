@@ -127,6 +127,30 @@ export class ApiClient {
     );
   }
 
+  // ── Account creation ──────────────────────────────────────────────────────
+
+  /**
+   * Abre una cuenta nueva para el customer, fondeada con un transfer inicial
+   * desde fromAccountId. Usada para crear cuentas descartables en tests que
+   * ejecutan operaciones destructivas (overdraft, montos límite) sin
+   * contaminar las cuentas fijas compartidas por el resto de la suite.
+   */
+  async createAccount(
+    customerId: number,
+    newAccountType: "CHECKING" | "SAVINGS",
+    fromAccountId: number,
+  ): Promise<Account> {
+    const params = new URLSearchParams({
+      customerId: String(customerId),
+      newAccountType: newAccountType === "CHECKING" ? "0" : "1",
+      fromAccountId: String(fromAccountId),
+    });
+    return this.post<Account>(
+      `/services/bank/createAccount?${params.toString()}`,
+    );
+  }
+
+
   // ── Session ────────────────────────────────────────────────────────────────
 
   async logout(): Promise<void> {

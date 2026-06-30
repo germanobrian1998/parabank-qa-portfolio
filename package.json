@@ -9,7 +9,9 @@
   "scripts": {
     "test": "npx playwright test",
     "test:smoke": "npx playwright test --grep @smoke",
-    "test:report": "npx ts-node scripts/generate-report.ts"
+    "test:report": "npx ts-node scripts/generate-report.ts",
+    "test:reset": "docker compose down -v && docker compose up -d parabank --wait",
+    "test:e2e": "npm run test:reset && npx playwright test"
   },
   "repository": {
     "type": "git",

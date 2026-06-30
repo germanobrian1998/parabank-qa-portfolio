@@ -1,0 +1,158 @@
+# Bug Report — H-007: Server Accepts Negative Amounts in Financial Transactions
+
+| Field | Value |
+|---|---|
+| **Bug ID** | H-007 |
+| **Title** | Server accepts negative monetary amounts across all financial transaction flows |
+| **Severity** | Critical |
+| **Priority** | P1 |
+| **Type** | Functional — Missing Server-Side Input Validation |
+| **Status** | Confirmed / Open |
+| **Reported By** | QA Engineer |
+| **Date Reported** | 2026-05-13 |
+| **Last Updated** | 2026-05-26 |
+| **Affected Component** | Transfer endpoint · Bill Pay endpoint · Loan Request endpoint |
+| **Regulatory Mapping** | PCI-DSS Requirement 6.3.3 — All software components are protected from known vulnerabilities via input validation |
+
+---
+
+## Environment
+
+| Property | Value |
+|---|---|
+| **SUT** | Parabank Banking Demo |
+| **Image** | `germanobrian1998/parabank:latest` |
+| **Base URL** | `http://localhost:8080/parabank` |
+| **Auth mechanism** | Session-based (JSESSIONID cookie) |
+| **Test files** | `tests/e2e/transfers.spec.ts` · `tests/e2e/billpay.spec.ts` · `tests/api/transfer.api.spec.ts` |
+
+---
+
+## Preconditions
+
+- Parabank Docker container is running and healthy
+- An authenticated session exists (valid `JSESSIONID` for user `john / demo`)
+- Two accounts with known IDs are available (provided by seeded dataset)
+- Steps to Reproduce — Transfer section use `fromAccountId=13344`, `toAccountId=13566` as confirmed in discovery
+
+---
+
+## Steps to Reproduce
+
+### Vector A — Fund Transfer (API)
+
+1. Authenticate: `POST /parabank/login.htm` with `username=john&password=demo`
+2. Capture `JSESSIONID` from the response cookie
+3. Send:
+
+```http
+POST /parabank/services/bank/transfer?fromAccountId=13344&toAccountId=13566&amount=-100
+Host: localhost:8080
+Cookie: JSESSIONID=<session>
+```
+
+4. Observe the HTTP response and the resulting account balances.
+
+### Vector B — Bill Pay (UI)
+
+1. Log in via UI as `john / demo`
+2. Navigate to **Bill Pay**
+3. Fill in valid payee details
+4. Enter `-100` in the **Amount** field
+5. Submit the form
+6. Observe the confirmation message
+
+### Vector C — Loan Request (UI)
+
+1. Log in via UI as `john / demo`
+2. Navigate to **Request Loan**
+3. Enter `-500` in the **Loan Amount** field
+4. Submit the request
+5. Observe the server response
+
+---
+
+## Expected Result
+
+The server should reject any monetary amount ≤ 0 across all financial flows and return an appropriate error:
+
+- **HTTP 400 Bad Request** with a descriptive error message for API calls
+- An inline error message for UI form submissions
+
+No transaction should be created and no funds should move when the submitted amount is negative or zero.
+
+---
+
+## Actual Result
+
+### Vector A — Transfer API:
+
+- **HTTP 200 OK**
+- Response body: `"Successfully transferred $-100 from account #13344 to account #13566"`
+- **Account 13344 (origin): balance increased by $100** — money flows in the opposite direction of the request
+- **Account 13566 (destination): balance decreased by $100**
+
+### Vector B — Bill Pay UI:
+
+- Confirmation message displayed: `"Bill Payment to [payee] in the amount of $-100.00 was successful"`
+- The transaction is recorded in the payment history with amount `-100.00`
+
+### Vector C — Loan Request UI:
+
+- The server processes the loan request with amount `-500`
+- An approval or denial decision is returned based on credit logic — the negative amount is not rejected before the credit evaluation step
+
+---
+
+## Impact Analysis
+
+**Business impact:**
+
+In the Transfer flow, a negative amount does not merely fail silently — it **inverts the direction of the transaction**. The origin account receives funds and the destination account loses them, which is the opposite of the intended operation. This creates an exploitable path for unauthorized fund movement if an attacker can control the `amount` parameter.
+
+In Bill Pay, a negative payment amount means the payee is effectively being debited rather than credited — a reversal of the payment relationship with no authorization mechanism.
+
+In Loan Request, a negative loan amount reaching the credit evaluation engine introduces undefined behavior in downstream accounting systems.
+
+**Systemic pattern:** this bug is not isolated to a single endpoint. The absence of server-side numeric range validation is consistent across all three financial flows, indicating the validation gap is architectural rather than a case-by-case oversight. HTML `min` attribute validation is present on the UI forms but is trivially bypassed by direct API calls.
+
+---
+
+## Evidence
+
+| Artifact | Location |
+|---|---|
+| Automated test — Transfer API | `tests/api/transfer.api.spec.ts` — marked `test.fail()` |
+| Automated test — Transfer E2E | `tests/e2e/transfers.spec.ts` — marked `test.fail()` |
+| Automated test — Bill Pay E2E | `tests/e2e/billpay.spec.ts` — marked `test.fail()` |
+| BVA decision table | `docs/bva-transfers-module.md` — negative amount boundary |
+| Narrative discovery notes | `docs/tech-discovery-report.md` — sections H-007, 4.2, 4.3 |
+
+---
+
+## Workaround
+
+No client-side workaround is effective. The HTML `min` attribute on form inputs provides cosmetic protection but does not prevent direct API calls with negative values. Mitigation requires server-side validation:
+
+1. Reject any `amount` ≤ 0 before executing business logic in all financial endpoints
+2. Return HTTP 400 with a structured error response
+3. Ensure the validation is applied at the service/domain layer, not only at the controller level, to protect against future endpoint additions
+
+---
+
+## Regulatory Mapping
+
+| Standard | Requirement | Relevance |
+|---|---|---|
+| PCI-DSS | Req. 6.3.3 — Protect all software components from known vulnerabilities | Missing server-side input validation is a well-documented vulnerability class |
+| PCI-DSS | Req. 6.2.4 — Prevent common software attacks including injection and improper input validation | Negative amounts represent improper input that the server processes without rejection |
+
+---
+
+## Related Bugs
+
+| Bug ID | Title | Relationship |
+|---|---|---|
+| H-015 | Server accepts negative amounts in loan requests | Same root cause — extends H-007 pattern to loan flow |
+| H-016 | Server accepts $0.00 transfers | Same root cause — zero is also an invalid financial amount; discovered via BVA of the same boundary |
+| H-010 | Overdraft allowed — insufficient balance not validated | Related systemic gap — server does not validate financial preconditions before executing transactions |

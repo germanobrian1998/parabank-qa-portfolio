@@ -36,10 +36,24 @@ async function setupAuthenticatedClient(): Promise<{
     );
   }
 
+  const funderAccount = accounts.find(
+    (a) => a.type === 'CHECKING' && a.balance > 100 && a.balance < 100_000,
+  );
+
+  if (!funderAccount) {
+    throw new Error(
+      'No se encontró cuenta CHECKING con balance sano para fondear cuentas ' +
+        'descartables — re-seed Docker image (docker compose down -v && up -d --wait)',
+    );
+  }
+
+  const fromAccount = await client.createAccount(customer.id, 'CHECKING', funderAccount.id);
+  const toAccount = await client.createAccount(customer.id, 'CHECKING', funderAccount.id);
+
   return {
     client,
-    fromAccountId: accounts[0].id,
-    toAccountId: accounts[1].id,
+    fromAccountId: fromAccount.id,
+    toAccountId: toAccount.id,
   };
 }
 
