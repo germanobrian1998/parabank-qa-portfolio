@@ -70,6 +70,81 @@ Rule: if a test needs another to have run first, it is a poorly designed test.
 
 ## Phase 3 — Continuous validation (Continuous Testing)
 
+### Test strategy tags: smoke, sanity, regression
+
+Three distinct strategies are applied at different points in the delivery cycle,
+each serving a different purpose. The distinction matters: using the wrong
+strategy at the wrong moment wastes time or misses real failures.
+
+#### @smoke — Is the environment operational?
+
+**Purpose:** verify that the system is alive and the most critical paths are
+reachable. Smoke does not verify that features work correctly — it verifies
+that the infrastructure and deployment are functional enough to run further tests.
+
+**When it runs:** immediately after deployment, before any other test suite.
+If smoke fails, there is no point running the full suite.
+
+**Duration target:** < 3 minutes.
+
+**Tagged tests in this project:**
+
+| Test | File | What it verifies |
+|---|---|---|
+| `should register a new customer and redirect to welcome page` | `auth.spec.ts` | Registration endpoint reachable |
+| `should authenticate with valid credentials and show account overview` | `auth.spec.ts` | Login endpoint functional, session established |
+| `should log out and redirect to public page` | `auth.spec.ts` | Session termination works |
+| `should open a CHECKING account and display confirmation with new account ID` | `accounts.spec.ts` | Account creation endpoint reachable |
+| `should show new account in overview immediately after creation` | `accounts.spec.ts` | DB persistence and overview rendering |
+| `should complete bill payment and show confirmation with correct details` | `billpay.spec.ts` | Bill pay flow end-to-end reachable |
+
+Run with: `npx playwright test --grep @smoke`
+
+#### @sanity — Does critical functionality work after a change?
+
+**Purpose:** verify that the business-critical features work correctly after a
+code change or deployment. Sanity assumes the environment is operational (smoke
+already passed) and focuses on whether the features themselves produce correct
+results.
+
+**When it runs:** after a deployment or after merging a significant change,
+before promoting to the next environment. A failing sanity test means the change
+broke something critical and the deployment should not proceed.
+
+**Duration target:** < 5 minutes. Sanity is a subset of the full regression suite,
+not a replacement for it.
+
+**Difference from smoke:** smoke asks "is the system up?"; sanity asks "does the
+system work?". A smoke test that navigates to the login page and finds it renders
+is passing even if login itself is broken. A sanity test that attempts a real
+login with credentials and verifies the session was established will catch that.
+
+**Tagged tests in this project:**
+
+| Test | File | What it verifies |
+|---|---|---|
+| `should authenticate with valid credentials and show account overview` | `auth.spec.ts` | Full login flow produces authenticated session |
+| `should log out and redirect to public page` | `auth.spec.ts` | Session termination produces correct state |
+| `should open a CHECKING account and display confirmation with new account ID` | `accounts.spec.ts` | Account creation produces valid account ID |
+| `should confirm transfer and reflect updated balance in both accounts` | `transfer.spec.ts` | Money movement executes and produces confirmation |
+| `should complete bill payment and show confirmation with correct details` | `billpay.spec.ts` | Bill pay produces correct confirmation details |
+
+Run with: `npx playwright test --grep @sanity`
+
+#### Regression — Does everything still work?
+
+**Purpose:** full suite execution verifying all covered functionality, including
+edge cases, negative paths, API contract validation, accessibility, and
+performance thresholds.
+
+**When it runs:** on every PR (full suite + performance in parallel via GitHub
+Actions DAG) and nightly at 3am UTC.
+
+**No explicit tag needed:** the full suite runs by default. Regression is not a
+subset — it is everything.
+
+---
+
 ### On every push
 git push → smoke suite (< 3 min) → immediate result
 The smoke suite covers the three highest-risk flows: authentication,
@@ -118,6 +193,31 @@ different from what was expected:
 **400 vs 404:** HTTP 400 with a null binding error points to an incorrect
 parameter name. HTTP 404 points to an incorrect URL or casing. The status code
 is the fastest diagnostic for endpoints with undocumented contracts.
+
+---
+
+## Parallelism and worker configuration
+
+`playwright.config.ts` runs with `fullyParallel: false` and `workers: 1`.
+This is a deliberate decision, not a limitation of the framework.
+
+Parabank uses a shared in-memory HSQLDB instance. Tests that create accounts,
+execute transfers, or modify balances mutate shared state. Running them in
+parallel causes race conditions: a transfer test may read a balance that a
+concurrent account creation test has already modified, producing false failures
+that mask real bugs.
+
+The architecture supports parallelism — Playwright's worker model, the fixture
+design, and the API setup pattern are all parallel-safe at the framework level.
+Parallelism would be enabled by one of:
+
+- Isolating each worker to its own Parabank Docker instance (one container per worker)
+- Migrating to a database that supports schema-per-tenant isolation (e.g. PostgreSQL with per-test schemas)
+- Scoping all tests to API-only operations with no shared UI state
+
+For this SUT, `workers: 1` is correct. The performance cost (~3.5 min full suite)
+is acceptable given the accuracy gain. See `playwright.config.ts` for the inline
+rationale.
 
 ---
 

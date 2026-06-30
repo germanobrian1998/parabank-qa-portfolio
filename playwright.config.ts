@@ -3,9 +3,37 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
 
-  // No parallelism — Parabank is a stateful app with a shared HSQLDB instance.
-  // Running tests in parallel causes race conditions between fixtures that
-  // create accounts or modify balances. A single worker guarantees isolation.
+  // PARALLELISM — why workers: 1 and fullyParallel: false
+  //
+  // Parabank uses HSQLDB: an embedded, in-memory database that runs inside
+  // the same JVM process as the application. All tests share a single DB
+  // instance with no transaction isolation between concurrent requests.
+  //
+  // Tests in this suite modify shared state: they create accounts, execute
+  // transfers, and change balances. Running them in parallel causes race
+  // conditions — a transfer test reading a balance may see a value that a
+  // concurrent account-creation test has already modified, producing false
+  // failures that mask real bugs.
+  //
+  // workers: 1 is the correct setting for this SUT. It is not a framework
+  // limitation — Playwright's worker model, the fixture design, and the API
+  // setup pattern are all parallel-safe at the framework level.
+  //
+  // Parallelism would be re-enabled by one of:
+  //   (a) One Docker container per worker — each worker gets its own isolated
+  //       Parabank + HSQLDB instance. Requires dynamic port allocation and
+  //       a baseURL per worker via workerStorageState or env injection.
+  //   (b) PostgreSQL with per-test schema isolation — each test creates its
+  //       own schema, runs, then drops it. Not viable with HSQLDB.
+  //   (c) API-only tests with no shared UI state — stateless tests can run
+  //       in parallel safely; only stateful E2E tests need sequential execution.
+  //
+  // The microservices fintech framework project (payments-service +
+  // accounts-service with PostgreSQL) implements option (b) — each test
+  // runs against its own schema via Testcontainers, enabling full parallelism.
+  //
+  // See docs/testing-methodology.md — "Parallelism and worker configuration"
+  // for the full rationale and trade-off analysis.
   fullyParallel: false,
   workers: 1,
 
