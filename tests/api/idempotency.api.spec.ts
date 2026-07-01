@@ -83,17 +83,28 @@ async function setupLoanClient(): Promise<{
     funderAccount.id,
   );
 
-  // La cuenta descartable nace con balance 0 — hay que fondearla explícitamente
-  // con un monto suficiente para cubrir el down payment de los tests ($100).
   await client.transfer(funderAccount.id, disposableAccount.id, 500);
+
+  // Confirmar que la cuenta recién creada y fondeada es visible end-to-end
+  // antes de devolverla. Bajo CI (recursos más ajustados que en local), se
+  // observó una condición de carrera real: requests concurrentes contra
+  // /requestLoan podían fallar con "Could not find account" si llegaban
+  // antes de que la escritura de createAccount/transfer estuviera
+  // completamente confirmada para ese endpoint específico.
+  const confirmed = await client.getAccount(disposableAccount.id);
+  if (confirmed.balance !== 500) {
+    throw new Error(
+      `[setupLoanClient] La cuenta descartable #${disposableAccount.id} no ` +
+        `refleja el fondeo esperado (esperado: 500, actual: ${confirmed.balance}). ` +
+        `Posible lag de consistencia en el servidor.`,
+    );
+  }
 
   return {
     client,
     customerId: customer.id,
     fromAccountId: disposableAccount.id,
   };
-}
-
 async function countLoanAccounts(
   client: ApiClient,
   customerId: number,
@@ -240,4 +251,5 @@ test.describe("Idempotency — loan request endpoint", () => {
       await client2.dispose();
     }
   });
-});
+}); 
+}
