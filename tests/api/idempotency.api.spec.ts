@@ -48,40 +48,49 @@ async function setupLoanClient(): Promise<{
   const customer = await client.login("john", "demo");
   const accounts = await client.getAccountsForCustomer(customer.id);
 
-  // MIN_DOWN_PAYMENT debe coincidir con el downPayment usado en los tests (100).
-  // MAX_REASONABLE_BALANCE excluye cuentas contaminadas por corridas previas de
-  // k6 stress test (ver CHANGELOG v0.3.0/v0.4.0): el stress test acumula
-  // transferencias sin resetear estado entre corridas, dejando algunas cuentas
-  // con balances de miles de millones (ej: $2,002,994,958.48) y otras en
-  // saldo negativo equivalente. Se confirmó empíricamente que una cuenta con
-  // balance > $1,000,000 hace que /requestLoan rechace con
-  // "error.insufficient.funds.for.down.payment" — un mensaje engañoso: el
-  // problema no es falta de fondos sino, lo más probable, un desborde o una
-  // validación de riesgo del lado del servidor ante montos fuera de rango.
+  // No usamos un pool compartido de cuentas del seed (accounts.find(...)).
+  // Cada llamada a setupLoanClient() aprueba un préstamo que debita el down
+  // payment de la cuenta elegida, dejándola en balance 0 — sucesivas llamadas
+  // (desde environment.spec.ts smoke y desde los 3 tests de este archivo)
+  // agotan progresivamente el pool de cuentas elegibles del seed, haciendo
+  // que tests posteriores terminen resolviendo cuentas cada vez más al final
+  // de la lista. Bajo CI (recursos más limitados, timing distinto a local)
+  // esto expuso una race condition real en Parabank cuando la cuenta
+  // resuelta se usa en requests concurrentes — ver H-019.
+  // Se abre una cuenta descartable, fondeada dinámicamente, para aislar
+  // cada test del estado acumulado de corridas anteriores.
   const MIN_DOWN_PAYMENT = 100;
   const MAX_REASONABLE_BALANCE = 1_000_000;
-  const fundedAccount = accounts.find(
+  const funderAccount = accounts.find(
     (a) =>
-      a.type !== "LOAN" &&
-      a.balance >= MIN_DOWN_PAYMENT &&
-      a.balance <= MAX_REASONABLE_BALANCE,
+      a.type === "CHECKING" &&
+      a.balance > MIN_DOWN_PAYMENT &&
+      a.balance < MAX_REASONABLE_BALANCE,
   );
 
-  if (!fundedAccount) {
+  if (!funderAccount) {
     throw new Error(
-      `[setupLoanClient] Ninguna cuenta de John tiene balance entre ` +
-        `${MIN_DOWN_PAYMENT} y ${MAX_REASONABLE_BALANCE} (rango requerido para ` +
-        `un test de préstamo limpio, no contaminado por stress tests previos). ` +
-        `Cuentas disponibles: ` +
+      `[setupLoanClient] Ninguna cuenta de John tiene balance sano para fondear ` +
+        `una cuenta descartable de préstamo. Cuentas disponibles: ` +
         `${accounts.map((a) => `#${a.id} ${a.type}=$${a.balance}`).join(", ")}. ` +
         `Re-seedear la BD o ajustar el rango.`,
     );
   }
 
+  const disposableAccount = await client.createAccount(
+    customer.id,
+    "CHECKING",
+    funderAccount.id,
+  );
+
+  // La cuenta descartable nace con balance 0 — hay que fondearla explícitamente
+  // con un monto suficiente para cubrir el down payment de los tests ($100).
+  await client.transfer(funderAccount.id, disposableAccount.id, 500);
+
   return {
     client,
     customerId: customer.id,
-    fromAccountId: fundedAccount.id,
+    fromAccountId: disposableAccount.id,
   };
 }
 
