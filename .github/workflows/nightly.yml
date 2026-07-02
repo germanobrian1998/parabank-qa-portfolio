@@ -86,7 +86,7 @@ jobs:
         # continue-on-error: false — el nightly debe reportar fallos reales.
         # A diferencia de performance (continue-on-error: true en CI), los
         # fallos funcionales nocturnos sí son señal de acción requerida.
-        run: npx playwright test --reporter=html,github
+        run: npx playwright test
         env:
           CI: true
 
