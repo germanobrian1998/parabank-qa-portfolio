@@ -150,7 +150,7 @@ jobs:
       - name: Run full test suite
         # --reporter=html,github genera reporte HTML + anotaciones nativas en el
         # PR (checks con detalles de cada test fallido).
-        run: npx playwright test --reporter=html,github
+        run: npx playwright test
         env:
           CI: true
 

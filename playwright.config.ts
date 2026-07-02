@@ -47,6 +47,7 @@ export default defineConfig({
     ["html"],
     // JUnit XML for CI integration and for generate-report.ts
     ["junit", { outputFile: "test-results/results.xml" }],
+    ["github"],
   ],
 
   use: {
