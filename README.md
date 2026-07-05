@@ -34,6 +34,52 @@ Parabank is a banking demo application with real-world complexity: session manag
 
 This framework is my answer to those questions, implemented and validated.
 
+
+
+
+## Architecture at a glance
+
+Four layers, one direction of dependency. Full rationale, dependency rules, and the API-Client/Page-Object separation decision are in [`docs/architecture-diagram.md`](docs/architecture-diagram.md).
+
+```mermaid
+flowchart TD
+    subgraph TEST["🧪 Test Layer"]
+        direction LR
+        E2E["tests/e2e/<br/>full user flows"]
+        API_T["tests/api/<br/>contract & authorization"]
+        EDGE["tests/edge-cases/<br/>BVA boundaries"]
+        A11Y["tests/accessibility/<br/>WCAG 2.1 AA"]
+    end
+
+    subgraph PAGE["🖥️ Page / Service Layer"]
+        direction LR
+        POM["src/pages/<br/>Page Object Model"]
+        APICLIENT["src/api/client/<br/>ApiClient.ts<br/>(separate from POM)"]
+    end
+
+    subgraph DATA["🏭 Data Layer"]
+        direction LR
+        FACT["src/factories/<br/>Faker-based dynamic data"]
+        FIX["src/fixtures/<br/>authenticatedAsJohn, etc."]
+    end
+
+    subgraph INFRA["⚙️ Infrastructure Layer"]
+        direction LR
+        PW["playwright.config.ts<br/>workers: 1"]
+        DOCKER["docker-compose.yml<br/>seeded HSQLDB image"]
+        CI["GitHub Actions<br/>smoke → full + performance"]
+    end
+
+    TEST -->|imports & composes| PAGE
+    PAGE -->|imports| DATA
+    DATA -->|configures environment via| INFRA
+
+    style TEST fill:#1e3a5f,stroke:#4a90d9,color:#fff
+    style PAGE fill:#3d2e5c,stroke:#8b5cf6,color:#fff
+    style DATA fill:#4a3319,stroke:#d97706,color:#fff
+    style INFRA fill:#1f3d2e,stroke:#22c55e,color:#fff
+```
+
 ---
 
 ## Project status
